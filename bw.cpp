@@ -163,7 +163,7 @@ void tcp_flow::update_ack(u_int ack, u_short payload_len, double ts, double _act
     while (m != ai && ack_down[m] != 0 && ack_ts[ai] - ack_ts[m] >= 20 * gval) { // 1/20 = 5% error
         if (bw_estimate(m)) {
             //reset after one successful bandwidth estimation  ? ? ?
-            reset_seq();
+            //reset_seq();
             break;
         }
         m = get_ai_next(m);
@@ -396,7 +396,7 @@ void tcp_flow::print(u_short processed_flags) {
         avg_bw = (double)(total_bw / (double)sample_count);
 
     printf("%s ", ConvertIPToString(clt_ip)); // 1
-    printf("%s %d %d %.4lf %.4lf %.4lf %.4lf %d %d %d %lld %lld %.4lf %lld %.4lf %.4lf %lld %lld %.4lf %d\n",
+    printf("%s %d %d %.4lf %.4lf %.4lf %.4lf %d %d %d %lld %lld %.4lf %lld %.4lf %.4lf %lld %lld %.4lf %d %.4lf\n",
            ConvertIPToString(svr_ip), //2
            clt_port, //3
            svr_port, //4
@@ -416,6 +416,7 @@ void tcp_flow::print(u_short processed_flags) {
            dup_ack_count, //18
            outorder_seq_count, //19
            avg_bw, //20
-           sample_count //21
+           sample_count, //21
+           gval //22
            );    
 }
