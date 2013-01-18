@@ -34,6 +34,9 @@ tcp_flow::tcp_flow() {
     packet_count = 0;
     dup_ack_count = 0;
     outorder_seq_count = 0;
+    
+    total_bw = 0;
+    sample_count = 0;
 
     reset_seq();
     reset_ack();
@@ -66,6 +69,9 @@ tcp_flow::tcp_flow(u_int _svr_ip, u_int _clt_ip, u_short _svr_port, u_short _clt
     packet_count = 0;
     dup_ack_count = 0;
     outorder_seq_count = 0;
+    
+    total_bw = 0;
+    sample_count = 0;
     
     reset_seq();
     reset_ack();
@@ -270,13 +276,22 @@ bool tcp_flow::bw_estimate(short start_ai) {
         if (bw < 45000000.0 / ONE_MILLION  &&
             bw_send >= BW_MAX_BITS_PER_SECOND / ONE_MILLION) {
             
-            string big_flow_index = ConvertIPToString(clt_ip) + string("_");
+            if (actual_ts - last_time > bwstep) {
+                total_bw += bw;
+                sample_count++;
+            }
+            
+            /*
+             //time sample for each step
+             string big_flow_index = ConvertIPToString(clt_ip) + string("_");
             big_flow_index += ConvertIPToString(svr_ip) + string("_");
             big_flow_index += NumberToString(clt_port) + string("_") + NumberToString(svr_port);
             
             while (actual_ts > target + 0.4 * bwstep) {
                 if (abs(last_time - target) <= 0.4 * bwstep) {
-                    cout << "BW_ESTIMATE_SAMPLE " << big_flow_index << " " << target << " " << last_throughput << " " << abs(ack_ts[ai] - ack_ts[start_ai]) << " " << (seq_down[s2] - seq_down[s1]) << endl;
+                    //cout << "BW_ESTIMATE_SAMPLE " << big_flow_index << " " << target << " " << last_throughput << " " << abs(ack_ts[ai] - ack_ts[start_ai]) << " " << (seq_down[s2] - seq_down[s1]) << endl;
+                    total_bw += last_throughput;
+                    sample_count++;
                 } else {
                     //cout << "BW_ESTIMATE_SAMPLE " << target << " " << 0 << " " << 0 << endl;
                 }
@@ -285,14 +300,20 @@ bool tcp_flow::bw_estimate(short start_ai) {
             //actual_ts <= target + 0.2 * bwstep
             if (last_time <= target && target <= actual_ts) {
                 if (abs(last_time - target) < abs(actual_ts - target)) {
-                    cout << "BW_ESTIMATE_SAMPLE " << big_flow_index << " " << target << " " << last_throughput << " " << (ack_ts[ai] - ack_ts[start_ai]) << " " << (seq_down[s2] - seq_down[s1]) << endl;
+                    //cout << "BW_ESTIMATE_SAMPLE " << big_flow_index << " " << target << " " << last_throughput << " " << (ack_ts[ai] - ack_ts[start_ai]) << " " << (seq_down[s2] - seq_down[s1]) << endl;
+                    total_bw += last_throughput;
+                    sample_count++;
                 } else {
-                    cout << "BW_ESTIMATE_SAMPLE " << big_flow_index << " " << target << " " << bw << " " << (ack_ts[ai] - ack_ts[start_ai]) << " " << (seq_down[s2] - seq_down[s1]) << endl;
+                    //cout << "BW_ESTIMATE_SAMPLE " << big_flow_index << " " << target << " " << bw << " " << (ack_ts[ai] - ack_ts[start_ai]) << " " << (seq_down[s2] - seq_down[s1]) << endl;
+                    total_bw += bw;
+                    sample_count++;
                 }
                 target += bwstep;
             } else if (target < last_time) {
                 if (abs(last_time - target) <= 0.4 * bwstep) {
-                    cout << "BW_ESTIMATE_SAMPLE " << big_flow_index << " " << target << " " << last_throughput << " " << (ack_ts[ai] - ack_ts[start_ai]) << " " << (seq_down[s2] - seq_down[s1]) << endl;
+                    //cout << "BW_ESTIMATE_SAMPLE " << big_flow_index << " " << target << " " << last_throughput << " " << (ack_ts[ai] - ack_ts[start_ai]) << " " << (seq_down[s2] - seq_down[s1]) << endl;
+                    total_bw += last_throughput;
+                    sample_count++;
                 } else {
                     //cout << "BW_ESTIMATE_SAMPLE " << target << " " << 0 << " " << 0 << endl;
                 }
@@ -370,9 +391,12 @@ void tcp_flow::print(u_short processed_flags) {
         syn_rtt = 0;
     if (syn_ack_rtt < 0)
         syn_ack_rtt = 0;
+    double avg_bw = 0;
+    if (sample_count > 0)
+        avg_bw = (double)(total_bw / (double)sample_count);
 
     printf("%s ", ConvertIPToString(clt_ip)); // 1
-    printf("%s %d %d %.4lf %.4lf %.4lf %.4lf %d %d %d %lld %lld %.4lf %lld %.4lf %.4lf %lld %lld\n",
+    printf("%s %d %d %.4lf %.4lf %.4lf %.4lf %d %d %d %lld %lld %.4lf %lld %.4lf %.4lf %lld %lld %.4lf %d\n",
            ConvertIPToString(svr_ip), //2
            clt_port, //3
            svr_port, //4
@@ -390,6 +414,8 @@ void tcp_flow::print(u_short processed_flags) {
            syn_rtt, //16
            syn_ack_rtt, //17
            dup_ack_count, //18
-           outorder_seq_count //19
+           outorder_seq_count, //19
+           avg_bw, //20
+           sample_count //21
            );    
 }

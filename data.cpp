@@ -205,6 +205,10 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         //big_flow_index.compare("10.9.63.12_68.142.123.131_1216_80") == 0 ||
                         //big_flow_index.compare("10.9.63.12_8.254.15.254_1504_80") == 0) {
                         big_flow_index.compare("10.46.6.151_74.125.227.65_54587_80") == 0 //Youtube traffic, reusing flow
+                        //1231    180724  1350088578.551052       10.46.6.151     54587   74.125.227.65   80      Host: 3.bp.blogspot.com User-Agent: Mozilla/5.0 (iPad; CPU OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A403 Safari/8536.25        Referer: http://jenniferstano.blogspot.com/search?updated-max=2012-08-07T15:28:00-07:00&max-results=20&start=3&by-date=false    Http Len: 22746
+                        ||
+                         big_flow_index.compare("10.9.131.253_74.125.215.179_51071_80") == 0 //iPad, AppleCoreMedia
+                        //12601   1219331 1350876729.943984       10.9.131.253    51071   74.125.215.179  80      Host: r4---sn-a5m7zu7d.c.youtube.com    User-Agent: AppleCoreMedia/1.0.0.9B206 (iPad; U; CPU OS 5_1_1 like Mac OS X; en_us)     NULL    Http Len: 22747
                         ) {
                         pcap_dump((u_char *)dumper, header, pkt_data);
                         pcap_dump_flush(dumper);
@@ -310,7 +314,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                                     }
                                 } else if (double_start[big_flow_index] > 0 && ts - double_start[big_flow_index] > GVAL_TIME) {
                                     gval[big_flow_index] = (ts - double_start[big_flow_index]) / (bswap32(*opt_ts) - u_int_start[big_flow_index]);
-                                    cout << big_flow_index << " G_VALUE infered time offset " << (ts - double_start[big_flow_index]) << " G: " << gval[big_flow_index] << " seconds/tick" << endl;
+                                    cout << "G_INFER " << big_flow_index << " infered time offset " << (ts - double_start[big_flow_index]) << " G: " << gval[big_flow_index] << " seconds/tick" << endl;
                                     flow->gval = gval[big_flow_index];
                                 }
                             }

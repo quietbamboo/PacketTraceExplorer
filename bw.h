@@ -55,6 +55,8 @@ public:
     uint64 packet_count;
     uint64 dup_ack_count;
     uint64 outorder_seq_count;
+    double total_bw;
+    int sample_count;
 
     tcp_flow();
     tcp_flow(u_int _svr_ip, u_int _clt_ip, u_short _svr_port, u_short _clt_port, double _start_time);
