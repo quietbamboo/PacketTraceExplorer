@@ -178,9 +178,25 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         port_svr = bswap16(ptcp->th_sport);
                     } else {
                         break;
-                    } 
+                    }
                     
-                    //big flow analysis
+                    //sequence number ACK number plot
+                    /*bool isUplink = true;
+                    if (RUNNING_LOCATION == RLOC_CONTROL_SERVER) {
+                        if (b1 && !b2 && isUplink) { // uplink
+                            cout << ts << " " << packet_count;
+                             cout << " src " << ConvertIPToString(pip->ip_src.s_addr) << " ";
+                             cout << " dst " << ConvertIPToString(pip->ip_dst.s_addr) << " ";
+                             cout << bswap32(ptcp->th_ack) << endl;//
+                        } else if (!b1 && b2 && !isUplink) { //downlink
+                            cout << ts << " " << packet_count;
+                            cout << " src " << ConvertIPToString(pip->ip_src.s_addr) << " ";
+                            cout << " dst " << ConvertIPToString(pip->ip_dst.s_addr) << " ";
+                            cout << bswap32(ptcp->th_seq) << endl;//
+                        }
+                    }//*/
+                    
+                    /*//big flow analysis
                     big_flow_index = ConvertIPToString(ip_clt) + string("_");
                     big_flow_index += ConvertIPToString(ip_svr) + string("_");
                     big_flow_index += NumberToString(port_clt) + string("_") + NumberToString(port_svr);
@@ -199,7 +215,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     }//*/
                     
                     //dump interested flow
-                    if (//big_flow_index.compare("10.134.12.177_96.17.164.36_1556_1935") == 0 ||
+                    /*if (//big_flow_index.compare("10.134.12.177_96.17.164.36_1556_1935") == 0 ||
                         //big_flow_index.compare("10.34.229.236_90.84.51.8_40214_80") == 0 ||
                         //big_flow_index.compare("10.8.102.148_107.14.33.153_2463_80") == 0 ||
                         //big_flow_index.compare("10.9.63.12_68.142.123.131_1216_80") == 0 ||
@@ -286,7 +302,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         }
                     }
                     
-                    /*//RTT and TCP pattern analysis
+                    //RTT and TCP pattern analysis
                     if (ip_clt == flow->clt_ip && ip_svr == flow->svr_ip &&
                         port_clt == flow->clt_port && port_svr == flow->svr_port) {
                         if (b1 && !b2) { // uplink
@@ -297,7 +313,8 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     }//*/
                     
                     
-                    //BWE analysis
+                    
+                    /*//BWE analysis
                     if (gval[big_flow_index] < 0) {
                         //do G inference for BW estimate
                         if (b1 && !b2) { // uplink
@@ -353,20 +370,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         }
                     }//*/
                     
-                    /*if (RUNNING_LOCATION == RLOC_CONTROL_SERVER && packet_count >= 206870 && packet_count <= 243382) {
-                        if (b1 && !b2) { // uplink
-                            cout << ts << " " << packet_count;
-                            cout << " src " << ConvertIPToString(pip->ip_src.s_addr) << " ";
-                            cout << " dst " << ConvertIPToString(pip->ip_dst.s_addr) << " ";
-                            cout << bswap32(ptcp->th_ack) << endl;//
-                        } else if (!b1 && b2) { //downlink
-                            /*cout << ts << " " << packet_count;
-                            cout << " src " << ConvertIPToString(pip->ip_src.s_addr) << " ";
-                            cout << " dst " << ConvertIPToString(pip->ip_dst.s_addr) << " ";
-                            cout << bswap32(ptcp->th_seq) << endl;//
-                        }
-
-                    }*/
+                    
                     /*if (packet_count == 38084) {
                         cout << "create flow here" << endl;
                         flow = new tcp_flow(ip_svr, ip_clt, port_svr, port_clt);
@@ -520,7 +524,7 @@ int init_global() {
         if (RUNNING_LOCATION == RLOC_ATT_SERVER) {
             big_flow_path = "/q/gp13/dpi/tcprx/work/data/flow_target.data";
         } else if (RUNNING_LOCATION == RLOC_ATT_CLIENT) {
-            big_flow_path = "/Users/hjx/Documents/4G/figures/traffic/data/flow_target2.data";
+            big_flow_path = "/Users/hjx/Documents/4G/figures/traffic/data/flow_target.data";
         }
         
         string key;

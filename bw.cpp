@@ -18,7 +18,7 @@ tcp_flow::tcp_flow() {
     idle_time = 0;
     
     target = start_time + GVAL_TIME;
-    bwstep = 0.5;
+    bwstep = 0.25;
     last_time = -1;
     last_throughput = -1;
     
@@ -53,7 +53,7 @@ tcp_flow::tcp_flow(u_int _svr_ip, u_int _clt_ip, u_short _svr_port, u_short _clt
     idle_time = 0;
     
     target = start_time + GVAL_TIME;
-    bwstep = 0.5;
+    bwstep = 0.25;
     last_time = -1;
     last_throughput = -1;
     
@@ -158,7 +158,12 @@ void tcp_flow::update_ack(u_int ack, u_short payload_len, double ts, double _act
     }
     
     //check if existing bw sample exists
-    int m = ax;
+    if (gval <= 0.00001) {
+        //no need to check for invalid gval
+        return;
+    }
+    
+    int m = get_ai_next(ax); //start from the second packet, so we can check the gap with the first ack
     //at least with two full packet samples
     while (m != ai && ack_down[m] != 0 && ack_ts[ai] - ack_ts[m] >= 20 * gval) { // 1/20 = 5% error
         if (bw_estimate(m)) {
@@ -258,6 +263,16 @@ void tcp_flow::update_ack_x(u_int ack, u_short payload_len, double _actual_ts) {
 
 //test with start_ai and ai
 bool tcp_flow::bw_estimate(short start_ai) {
+    
+    if (ack_down[start_ai] - ack_down[get_ai_previous(start_ai)] <= 1.1 * TCP_MAX_PAYLOAD) {
+        return false; //this ack is triggered by TCP's delayed ACK
+    }
+    
+    if (ack_down[ai] - ack_down[get_ai_previous(ai)] <= 1.1 * TCP_MAX_PAYLOAD) {
+        return false; //this ack is triggered by TCP's delayed ACK
+    }
+
+    
     short s1 = find_seq_by_ack(ack_down[start_ai], sx, si);
     short s2 = find_seq_by_ack(ack_down[ai], sx, si);
     if (s1 == -1 || s2 == -1 || s1 == s2)
@@ -277,6 +292,8 @@ bool tcp_flow::bw_estimate(short start_ai) {
             bw_send >= BW_MAX_BITS_PER_SECOND / ONE_MILLION) {
             
             if (actual_ts - last_time > bwstep) {
+                //cout << bw_send << " " << hex << ack_down[start_ai] << " " << ack_down[ai] << dec << endl;
+                cout << "BWES " << ConvertIPToString(clt_ip) << " " << actual_ts << " " << bw << " " << ack_ts[ai] - ack_ts[start_ai] << endl;    
                 total_bw += bw;
                 sample_count++;
             }

@@ -56,19 +56,21 @@ int main(int argc, const char * argv[]) {
     //init
     init_global();
     
-    /*//one file analysis
+    //one file analysis
     const char *test_file;
     switch (RUNNING_LOCATION) {
         case RLOC_ATT_SERVER:
             test_file = "/home/hjx/sample.pcap";
             break;
         case RLOC_ATT_CLIENT:
-            test_file = "/Users/hjx/Documents/trace_explorer/backup/test/sample.pcap";
+            //test_file = "/Users/hjx/Documents/trace_explorer/backup/test/sample.pcap";
+            //test_file = "/Users/hjx/Documents/trace_explorer/focus.pcap";
+            test_file = "/Users/hjx/Documents/trace_explorer/t1012.0073.pcap.hdr.pcap";
             break;
         case RLOC_CONTROL_SERVER:
+            test_file = "/Users/hjx/Documents/trace_explorer/focus.pcap";
             //test_file = "/Users/hjx/Documents/4G/figures/traffic/traces/tcpDownlink-new/121226tcpdownnwlte2/121226_042616731_tcp_down_thrpt_nw_lte_server.pcap";
-            test_file = "/Users/hjx/Documents/4G/figures/traffic/traces/tcpDownlink-new/1301nexus/130101_120301140_tcp_down_thrpt_sld_3g_server.pcap";
-            
+            //test_file = "/Users/hjx/Documents/4G/figures/traffic/traces/tcpDownlink-new/1301nexus/130101_120301140_tcp_down_thrpt_sld_3g_server.pcap";
             //test_file = "/Users/hjx/Documents/trace_explorer/backup/test/server_filtered.pcap";
             //test_file = "/Users/hjx/Documents/4G/figures/traffic/traces/tcpDownlink-new/121219nwtcpdown1/121219152225-downtcpserver.pcap";
             break;
