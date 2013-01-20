@@ -58,6 +58,8 @@ bool is_target_flow;
 tcp_flow *flow = NULL;
 client_bw *bw_udp = NULL;
 client_bw *bw_tcp = NULL;
+char *payload;
+string payload_str;
 
 void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_char *pkt_data) {
     //c is not used
@@ -180,21 +182,80 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         break;
                     }
                     
+                    cout << "C " << ConvertIPToString(ip_clt) << endl;
+                    cout << "S " << ConvertIPToString(ip_svr) << endl;
+                    
                     //sequence number ACK number plot
                     /*bool isUplink = true;
                     if (RUNNING_LOCATION == RLOC_CONTROL_SERVER) {
-                        if (b1 && !b2 && isUplink) { // uplink
-                            cout << ts << " " << packet_count;
+                        if (b1 && !b2 && isUplink) { // uplink, for ack
+                             cout << ts << " " << packet_count;
                              cout << " src " << ConvertIPToString(pip->ip_src.s_addr) << " ";
                              cout << " dst " << ConvertIPToString(pip->ip_dst.s_addr) << " ";
                              cout << bswap32(ptcp->th_ack) << endl;//
-                        } else if (!b1 && b2 && !isUplink) { //downlink
+                        } else if (!b1 && b2 && !isUplink) { //downlink, for seq
                             cout << ts << " " << packet_count;
                             cout << " src " << ConvertIPToString(pip->ip_src.s_addr) << " ";
                             cout << " dst " << ConvertIPToString(pip->ip_dst.s_addr) << " ";
                             cout << bswap32(ptcp->th_seq) << endl;//
                         }
                     }//*/
+                    
+                    /*//netflix study, this should be commented out for all other analysis
+                    //check whether current packet has TCP payload
+                    if (ETHER_HDR_LEN + BYTES_PER_32BIT_WORD * (pip->ip_hl + ptcp->th_off) < header->caplen)
+                        payload = (char *)((char *)ptcp + BYTES_PER_32BIT_WORD * ptcp->th_off);
+                    else
+                        payload = (char *)"";
+                    payload_str = string(payload);
+                    big_flow_index = ConvertIPToString(ip_clt) + string("_");
+                    big_flow_index += ConvertIPToString(ip_svr) + string("_");
+                    big_flow_index += NumberToString(port_clt) + string("_") + NumberToString(port_svr);
+                    if ((payload_str.find("GET ") == 0 || payload_str.find("HEAD ") == 0 ||
+                        payload_str.find("POST ") == 0 || payload_str.find("PUT ") == 0 ||
+                        payload_str.find("DELETE ") == 0 || payload_str.find("TRACE ") == 0 ||
+                        payload_str.find("OPTIONS ") == 0 || payload_str.find("CONNECT ") == 0 ||
+                        payload_str.find("PATCH ") == 0) && (b1 && !b2)) {
+                        //uplink HTTP request
+                        
+                        //output existing HTTP info
+                        if (big_flows[big_flow_index].first >= 0 && big_flows[big_flow_index].second > 0) {
+                            cout << big_flows[big_flow_index].first << " " << big_flows[big_flow_index].second;
+                            cout << " src " << ConvertIPToString(pip->ip_src.s_addr) << " ";
+                            cout << " dst " << ConvertIPToString(pip->ip_dst.s_addr) << " ";
+                            cout << port_clt << endl;
+                        }
+                        big_flows[big_flow_index] = make_pair(ts, 0);
+                    //} else if (payload_str.find("HTTP/1.") == 0 && (!b1 && b2)) {
+                        //downlink HTTP response
+                    //    size_t start_pos = payload_str.find("Content-Length: ");
+                    //    size_t end_pos = payload_str.find("\r\n", start_pos);
+                    //    int content_len = 0;
+                    //    if (start_pos != string::npos && end_pos > start_pos + 16)
+                    //        content_len = StringToNumber<int>(payload_str.substr(start_pos + 16, end_pos - start_pos - 16));
+                    } else if (payload_len > 0 && (!b1 && b2)) {
+                        big_flows[big_flow_index].second = ts;
+                    } else if ((ptcp->th_flags & TH_FIN) != 0 || (ptcp->th_flags & TH_RST) != 0) {
+                        //output existing HTTP info
+                        if (big_flows[big_flow_index].first >= 0 && big_flows[big_flow_index].second > 0) {
+                            cout << big_flows[big_flow_index].first << " " << big_flows[big_flow_index].second;
+                            cout << " src " << ConvertIPToString(pip->ip_src.s_addr) << " ";
+                            cout << " dst " << ConvertIPToString(pip->ip_dst.s_addr) << " ";
+                            cout << port_clt << endl;
+                        }
+                        big_flows[big_flow_index] = make_pair(-1, 0);
+                    }
+                    
+                     //use UDP flow to calculate aggregate throughput
+                     if (!b1 && b2) { //downlink
+                        //sample throughput here, using differnt time window
+                        if (bw_udp == NULL) {
+                            bw_udp = new client_bw(ts, 0.1);
+                        }
+                        bw_udp->add_packet(payload_len, ts);
+                    }//
+                    break;//*/
+                    
                     
                     /*//big flow analysis
                     big_flow_index = ConvertIPToString(ip_clt) + string("_");
@@ -209,7 +270,6 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                             is_target_flow = true;
                         }
                     }
-                    
                     if (!is_target_flow) {
                         break;
                     }//*/
@@ -403,6 +463,21 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                 udp_count++;
                 pudp = (udphdr *)((u_char *)pip + sizeof(ip));
                 payload_len = bswap16(pudp->uh_ulen) - UDP_HDR_LEN;
+                
+                if (b1 && !b2) { // uplink
+                    ip_clt = pip->ip_src.s_addr;
+                    ip_svr = pip->ip_dst.s_addr;
+                } else if (!b1 && b2) { //downlink
+                    ip_clt = pip->ip_dst.s_addr;
+                    ip_svr = pip->ip_src.s_addr;
+                } else {
+                    break;
+                }
+                
+                cout << "C " << ConvertIPToString(ip_clt) << " UDP" << endl;
+                cout << "S " << ConvertIPToString(ip_svr) << " UDP" << endl;
+
+                
                 if (RUNNING_LOCATION == RLOC_CONTROL_CLIENT) {
                     //UDP client side throughput sampling
                     if (!b1 && b2) { //downlink
