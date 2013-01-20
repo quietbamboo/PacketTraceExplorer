@@ -52,6 +52,11 @@ map<string, double> gval; // g value
 map<string, u_int> u_int_start;
 map<string, double> double_start;
 map<string, pair<double, double> >::iterator big_flow_it_tmp;
+
+map<u_int, u_int> cip;
+map<u_int, u_int> sip;
+map<u_int, u_int>::iterator csit;
+
 uint64 flow_index;
 string big_flow_index;
 bool is_target_flow;
@@ -182,8 +187,10 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         break;
                     }
                     
-                    cout << "C " << ConvertIPToString(ip_clt) << endl;
-                    cout << "S " << ConvertIPToString(ip_svr) << endl;
+                    //count CS IPs
+                    cip[ip_clt]++;
+                    sip[ip_svr]++;
+                    break;
                     
                     //sequence number ACK number plot
                     /*bool isUplink = true;
@@ -474,8 +481,9 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     break;
                 }
                 
-                cout << "C " << ConvertIPToString(ip_clt) << " UDP" << endl;
-                cout << "S " << ConvertIPToString(ip_svr) << " UDP" << endl;
+                //count CS IPs
+                cip[ip_clt]++;
+                sip[ip_svr]++;
 
                 
                 if (RUNNING_LOCATION == RLOC_CONTROL_CLIENT) {
@@ -587,6 +595,8 @@ int init_global() {
     enb_load.clear();
     client_flows.clear();
     last_prune_time = 0;
+    cip.clear();
+    sip.clear();
     
     big_flow_index = "default";
     big_flows.clear();
@@ -642,6 +652,16 @@ int read_pcap_trace(const char * filename) {
      cout << "ENB " << ConvertIPToString(*it) << endl;
      for (it = core_ip.begin() ; it != core_ip.end() ; it++)
      cout << "CORE " << ConvertIPToString(*it) << endl;//*/
+    
+    //count CS IPs
+    cout << "CIPCount " << cip.size() << " " << filename << endl;
+    cout << "SIPCount " << sip.size() << " " << filename << endl;
+    if (strcmp(filename, "/q/gp13/dpi/tcprx/work/raw/t1012.2781.pcap.hdr.pcap") == 0) {
+        for (csit = cip.begin() ; csit != cip.end() ; csit++)
+            cout << "CIP " << ConvertIPToString((*csit).first) << " " << (*csit).second << endl;
+        for (csit = sip.begin() ; csit != sip.end() ; csit++)
+            cout << "SIP " << ConvertIPToString((*csit).first) << " " << (*csit).second << endl;
+    }
     
     cout << "PacketCount " << packet_count << " " << filename << endl;
     cout << "NoIpCount " << no_ip_count << " " << filename << endl;
