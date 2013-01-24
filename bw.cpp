@@ -21,6 +21,9 @@ tcp_flow::tcp_flow() {
     bwstep = 0.25;
     last_time = -1;
     last_throughput = -1;
+    gval = 0;
+    syn_rtt = 0;
+    syn_ack_rtt = 0;
     
     has_ts_option_clt = false;
     has_ts_option_svr = false;
@@ -62,6 +65,9 @@ tcp_flow::tcp_flow(u_int _svr_ip, u_int _clt_ip, u_short _svr_port, u_short _clt
     bwstep = 0.25;
     last_time = -1;
     last_throughput = -1;
+    gval = 0;
+    syn_rtt = 0;
+    syn_ack_rtt = 0;
     
     has_ts_option_clt = false;
     has_ts_option_svr = false;
@@ -233,10 +239,6 @@ void tcp_flow::update_seq_x(u_int seq, u_short payload_len, double ts) {
         if (bytes_in_fly > max_bytes_in_fly)
             max_bytes_in_fly = bytes_in_fly;
     }    
-    if ((SAMPLES++) % SAMPLE_CYCLE == 0) {
-        cout << "BF " << bytes_in_fly << endl;
-    }
-
     
     if (last_time < 0) {
         last_time = ts;
@@ -272,6 +274,7 @@ void tcp_flow::update_ack_x(u_int ack, u_short payload_len, double _actual_ts) {
         bytes_after_dupack = 0;
         return;
     }
+    
     ai = get_ai_next(ai);
     ack_down[ai] = ack;
     ack_ts[ai] = _actual_ts;
@@ -290,9 +293,6 @@ void tcp_flow::update_ack_x(u_int ack, u_short payload_len, double _actual_ts) {
     //update bytes in fly after analysis
     if (bytes_in_fly > 0) {
         bytes_in_fly = seq_down[si] - ack_down[ai];
-    }
-    if ((SAMPLES++) % SAMPLE_CYCLE == 0) {
-        cout << "BF " << bytes_in_fly << endl;
     }
     
     if (last_time < 0) {
@@ -457,10 +457,6 @@ short tcp_flow::get_ai_previous(short c) {
 }
 
 void tcp_flow::print(u_short processed_flags) {
-    if (syn_rtt < 0)
-        syn_rtt = 0;
-    if (syn_ack_rtt < 0)
-        syn_ack_rtt = 0;
     double avg_bw = 0;
     if (sample_count > 0)
         avg_bw = (double)(total_bw / (double)sample_count);

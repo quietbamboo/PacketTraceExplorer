@@ -263,7 +263,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     }//
                     break;//*/
                     
-                    /*//big flow analysis
+                    //big flow analysis
                     big_flow_index = ConvertIPToString(ip_clt) + string("_");
                     big_flow_index += ConvertIPToString(ip_svr) + string("_");
                     big_flow_index += NumberToString(port_clt) + string("_") + NumberToString(port_svr);
@@ -369,13 +369,20 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     }
                     
                     //RTT and TCP pattern analysis
-                    if (ip_clt == flow->clt_ip && ip_svr == flow->svr_ip &&
-                        port_clt == flow->clt_port && port_svr == flow->svr_port) {
+                    if (ip_clt == flow->clt_ip &&
+                        ip_svr == flow->svr_ip &&
+                        port_clt == flow->clt_port &&
+                        port_svr == flow->svr_port) {
                         if (b1 && !b2) { // uplink
                             flow->update_ack_x(bswap32(ptcp->th_ack), payload_len, ts);
                         } else if (!b1 && b2) { //downlink
                             flow->update_seq_x(bswap32(ptcp->th_seq), payload_len, ts);
                         }
+                        //sample bytes_in_fly
+                        if ((SAMPLES++) % SAMPLE_CYCLE == 0) {
+                            cout << "BF " << flow->bytes_in_fly << endl;
+                        }
+
                     }//*/
                     
                     

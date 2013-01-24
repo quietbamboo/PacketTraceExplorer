@@ -12,7 +12,7 @@
 #include "util.h"
 #include "def.h"
 
-const int SEQ_INDEX_MAX = 1000;
+const int SEQ_INDEX_MAX = 2000;
 const int ACK_INDEX_MAX = SEQ_INDEX_MAX / 2; //1 ACK 2 Data PKTs
 
 class tcp_flow {

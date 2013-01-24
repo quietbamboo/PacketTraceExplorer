@@ -56,7 +56,7 @@ int main(int argc, const char * argv[]) {
     //init
     init_global();
     
-    //one file analysis
+    /*//one file analysis
     const char *test_file;
     switch (RUNNING_LOCATION) {
         case RLOC_ATT_SERVER:
