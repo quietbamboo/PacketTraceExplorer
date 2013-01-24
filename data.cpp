@@ -187,10 +187,10 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         break;
                     }
                     
-                    //count CS IPs
+                    /*//count CS IPs
                     cip[ip_clt]++;
                     sip[ip_svr]++;
-                    break;
+                    break;*/
                     
                     //sequence number ACK number plot
                     /*bool isUplink = true;
@@ -262,7 +262,6 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         bw_udp->add_packet(payload_len, ts);
                     }//
                     break;//*/
-                    
                     
                     /*//big flow analysis
                     big_flow_index = ConvertIPToString(ip_clt) + string("_");
@@ -481,9 +480,9 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     break;
                 }
                 
-                //count CS IPs
+                /*//count CS IPs
                 cip[ip_clt]++;
-                sip[ip_svr]++;
+                sip[ip_svr]++;*/
 
                 
                 if (RUNNING_LOCATION == RLOC_CONTROL_CLIENT) {
@@ -512,7 +511,6 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                 }
                 
                 if (port_svr == 53) {
-                
                     //UDP flow statistics analysis
                     flow_index = port_clt * (((uint64)1) << 32) + ip_clt;
                     flow_it_tmp = client_flows.find(flow_index);
@@ -625,6 +623,8 @@ int init_global() {
     //dump interest.pcap
     pcap_t *px = pcap_open_dead(DLT_EN10MB, 64);
     dumper = pcap_dump_open(px, "interest.pcap");
+    
+    SAMPLES = 0;
 }
 
 int read_pcap_trace(const char * filename) {
@@ -653,7 +653,7 @@ int read_pcap_trace(const char * filename) {
      for (it = core_ip.begin() ; it != core_ip.end() ; it++)
      cout << "CORE " << ConvertIPToString(*it) << endl;//*/
     
-    //count CS IPs
+    /*//count CS IPs
     cout << "CIPCount " << cip.size() << " " << filename << endl;
     cout << "SIPCount " << sip.size() << " " << filename << endl;
     if (strcmp(filename, "/q/gp13/dpi/tcprx/work/raw/t1012.2781.pcap.hdr.pcap") == 0) {
@@ -661,7 +661,7 @@ int read_pcap_trace(const char * filename) {
             cout << "CIP " << ConvertIPToString((*csit).first) << " " << (*csit).second << endl;
         for (csit = sip.begin() ; csit != sip.end() ; csit++)
             cout << "SIP " << ConvertIPToString((*csit).first) << " " << (*csit).second << endl;
-    }
+    }//*/
     
     cout << "PacketCount " << packet_count << " " << filename << endl;
     cout << "NoIpCount " << no_ip_count << " " << filename << endl;

@@ -12,7 +12,7 @@
 #include "util.h"
 #include "def.h"
 
-const int SEQ_INDEX_MAX = 2000;
+const int SEQ_INDEX_MAX = 1000;
 const int ACK_INDEX_MAX = SEQ_INDEX_MAX / 2; //1 ACK 2 Data PKTs
 
 class tcp_flow {
@@ -57,6 +57,12 @@ public:
     uint64 outorder_seq_count;
     double total_bw;
     int sample_count;
+    
+    double first_bw;
+    u_short dup_ack_count_current;
+    u_short slow_start_count; // start from 1 initial slow start
+    double last_dupack_time;
+    u_int bytes_after_dupack;
 
     tcp_flow();
     tcp_flow(u_int _svr_ip, u_int _clt_ip, u_short _svr_port, u_short _clt_port, double _start_time);

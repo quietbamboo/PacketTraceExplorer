@@ -35,6 +35,12 @@ tcp_flow::tcp_flow() {
     dup_ack_count = 0;
     outorder_seq_count = 0;
     
+    first_bw = 0;
+    dup_ack_count_current = 0;
+    slow_start_count = 1; // start from 1 initial slow start
+    last_dupack_time = 0;
+    bytes_after_dupack = 0;
+
     total_bw = 0;
     sample_count = 0;
 
@@ -69,6 +75,12 @@ tcp_flow::tcp_flow(u_int _svr_ip, u_int _clt_ip, u_short _svr_port, u_short _clt
     packet_count = 0;
     dup_ack_count = 0;
     outorder_seq_count = 0;
+    
+    first_bw = 0;
+    dup_ack_count_current = 0;
+    slow_start_count = 1; // start from 1 initial slow start
+    last_dupack_time = 0;
+    bytes_after_dupack = 0;
     
     total_bw = 0;
     sample_count = 0;
@@ -191,6 +203,28 @@ void tcp_flow::update_seq_x(u_int seq, u_short payload_len, double ts) {
     }
     
     if (payload_len > 0) {
+        //Slow start after dup ack
+        if (dup_ack_count_current > 50) {
+            bytes_after_dupack += payload_len;
+            if (first_bw == 0 && ts - last_dupack_time > DUPACK_SLOWSTART_TIME && ts - last_dupack_time <= 2 * DUPACK_SLOWSTART_TIME) {
+                //this is the time to output a throughput sample
+                double bw = bytes_after_dupack * 8 / (ts - last_dupack_time) / 1000.0; //kbps
+                first_bw = bw;
+                bytes_after_dupack = 0;
+                
+            } else if (first_bw > 0 && ts - last_dupack_time > 2 * DUPACK_SLOWSTART_TIME) {
+                double bw = bytes_after_dupack * 8 / (ts - last_dupack_time - DUPACK_SLOWSTART_TIME) / 1000.0; //kbps
+                if (first_bw > 0 && bw / first_bw > 1.5) {
+                    slow_start_count++;
+                }
+                cout << "SSBW " << bw / first_bw << " " << bw << " " << dup_ack_count_current << endl;
+                dup_ack_count_current = 0;
+                bytes_after_dupack = 0;
+                first_bw = 0;
+            }
+        }
+        
+        //Bytes in flight
         if (ai == -1) {
             bytes_in_fly = payload_len;
         } else {
@@ -198,13 +232,19 @@ void tcp_flow::update_seq_x(u_int seq, u_short payload_len, double ts) {
         }
         if (bytes_in_fly > max_bytes_in_fly)
             max_bytes_in_fly = bytes_in_fly;
+    }    
+    if ((SAMPLES++) % SAMPLE_CYCLE == 0) {
+        cout << "BF " << bytes_in_fly << endl;
     }
+
     
     if (last_time < 0) {
         last_time = ts;
     }
+    
     if (payload_len > 0 && ts - last_time > IDLE_THRESHOLD) {
         idle_time += (ts - last_time);
+        cout << "I " << (ts - last_time) << " D" << endl;
     }
     
     if (packet_count == 1) {
@@ -221,6 +261,15 @@ void tcp_flow::update_ack_x(u_int ack, u_short payload_len, double _actual_ts) {
     if (ai != -1 && ack_down[ai] > 0 && ack_down[ai] == ack && payload_len == 0) {
         //if payload not 0, this is uplink data packet
         dup_ack_count++;
+        
+        if (_actual_ts - last_dupack_time > 1.0) {
+            //new session
+            dup_ack_count_current = 1;
+        } else {
+            dup_ack_count_current++;
+        }
+        last_dupack_time = _actual_ts;
+        bytes_after_dupack = 0;
         return;
     }
     ai = get_ai_next(ai);
@@ -242,12 +291,16 @@ void tcp_flow::update_ack_x(u_int ack, u_short payload_len, double _actual_ts) {
     if (bytes_in_fly > 0) {
         bytes_in_fly = seq_down[si] - ack_down[ai];
     }
+    if ((SAMPLES++) % SAMPLE_CYCLE == 0) {
+        cout << "BF " << bytes_in_fly << endl;
+    }
     
     if (last_time < 0) {
         last_time = _actual_ts;
     }
     if (payload_len > 0 && _actual_ts - last_time > IDLE_THRESHOLD) {
         idle_time += (_actual_ts - last_time);
+        cout << "I " << (_actual_ts - last_time) << " U" << endl;
     }
     
     if (packet_count == 1) {
@@ -413,7 +466,7 @@ void tcp_flow::print(u_short processed_flags) {
         avg_bw = (double)(total_bw / (double)sample_count);
 
     printf("%s ", ConvertIPToString(clt_ip)); // 1
-    printf("%s %d %d %.4lf %.4lf %.4lf %.4lf %d %d %d %lld %lld %.4lf %lld %.4lf %.4lf %lld %lld %.4lf %d %.4lf\n",
+    printf("%s %d %d %.4lf %.4lf %.4lf %.4lf %d %d %d %lld %lld %.4lf %lld %.4lf %.4lf %lld %lld %.4lf %d %.4lf %d\n",
            ConvertIPToString(svr_ip), //2
            clt_port, //3
            svr_port, //4
@@ -434,6 +487,7 @@ void tcp_flow::print(u_short processed_flags) {
            outorder_seq_count, //19
            avg_bw, //20
            sample_count, //21
-           gval //22
+           gval, //22
+           slow_start_count //23
            );    
 }

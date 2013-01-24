@@ -23,7 +23,7 @@
 #define RLOC_CONTROL_SERVER 2
 #define RLOC_CONTROL_CLIENT 3
 
-#define RUNNING_LOCATION RLOC_CONTROL_SERVER
+#define RUNNING_LOCATION RLOC_ATT_CLIENT
 
 #define	ETHERTYPE_IP		0x08	/* IP protocol */
 
@@ -46,6 +46,10 @@ const double FLOW_MAX_IDLE_TIME = 3600.0;
 const double ONE_MILLION = 1000000.0;
 const double GVAL_TIME = 3.0;
 const double IDLE_THRESHOLD = 1.0; //seconds
+const double DUPACK_SLOWSTART_TIME = 0.1; //seconds
+
+static int SAMPLES = 0;
+const int SAMPLE_CYCLE = 500;
 
 typedef struct {
     u_int src_ip;
