@@ -266,19 +266,8 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     //big flow analysis
                     big_flow_index = ConvertIPToString(ip_clt) + string("_");
                     big_flow_index += ConvertIPToString(ip_svr) + string("_");
-                    big_flow_index += NumberToString(port_clt) + string("_") + NumberToString(port_svr);
-                    big_flow_it_tmp = big_flows.find(big_flow_index);
-                    is_target_flow = false;
-                    if (big_flow_it_tmp != big_flows.end()) {
-                        //found big flow
-                        if (ts >= big_flows[big_flow_index].first && ts <= big_flows[big_flow_index].first + big_flows[big_flow_index].second) {
-                            //target flow found
-                            is_target_flow = true;
-                        }
-                    }
-                    if (!is_target_flow) {
-                        break;
-                    }//*/
+                    big_flow_index += NumberToString(port_clt) + string("_");
+                    big_flow_index += NumberToString(port_svr);
                     
                     //dump interested flow
                     /*if (//big_flow_index.compare("10.134.12.177_96.17.164.36_1556_1935") == 0 ||
@@ -307,10 +296,25 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         double_start[big_flow_index] = -1.0;
                         u_int_start[big_flow_index] = 0;
                         
-                        client_flows[flow_index].clt_ip = ip_clt;
+                        big_flow_it_tmp = big_flows.find(big_flow_index);
+                        is_target_flow = false;
+                        if (big_flow_it_tmp != big_flows.end()) {
+                            //found big flow
+                            if (ts >= big_flows[big_flow_index].first && ts <= big_flows[big_flow_index].first + big_flows[big_flow_index].second) {
+                                //target flow found
+                                is_target_flow = true;
+                            }
+                        }
+                        
+                        client_flows[flow_index].clt_ip = ip_clt; //init a flow
                         flow_count++;
                         
                         flow = &client_flows[flow_index];
+                        if (is_target_flow) {
+                            flow->init(SEQ_INDEX_MAX);
+                        } else {
+                            flow->init(6);
+                        }
                         flow->svr_ip = ip_svr;
                         flow->clt_port = port_clt;
                         flow->svr_port = port_svr;
@@ -379,9 +383,8 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                             flow->update_seq_x(bswap32(ptcp->th_seq), payload_len, ts);
                         }
                         //sample bytes_in_fly
-                        if ((SAMPLES++) % SAMPLE_CYCLE == 0) {
-                            cout << "BF " << flow->bytes_in_fly << endl;
-                        }
+                        //if ((SAMPLES++) % SAMPLE_CYCLE == 0)
+                        //    cout << "BF " << flow->bytes_in_fly << endl;
 
                     }//*/
                     

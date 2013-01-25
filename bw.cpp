@@ -46,9 +46,8 @@ tcp_flow::tcp_flow() {
 
     total_bw = 0;
     sample_count = 0;
-
-    reset_seq();
-    reset_ack();
+    
+    init(0);
 }
 
 //should only be called called by SYN packet
@@ -91,6 +90,27 @@ tcp_flow::tcp_flow(u_int _svr_ip, u_int _clt_ip, u_short _svr_port, u_short _clt
     total_bw = 0;
     sample_count = 0;
     
+    init(0);
+}
+
+void tcp_flow::init(int sm) {
+    if (sm == 0) {
+        seq_down = NULL;
+        seq_ts = NULL;
+        seq_max = 0;
+        ack_down = NULL;
+        ack_ts = NULL;
+        ack_max = 0;
+        return;
+    }
+    
+    seq_down = new u_int[sm];
+    seq_ts = new double[sm];
+    seq_max = sm;
+    ack_down = new u_int[sm / 2];
+    ack_ts = new double[sm / 2];
+    ack_max = sm / 2;
+    
     reset_seq();
     reset_ack();
 }
@@ -99,8 +119,10 @@ tcp_flow::tcp_flow(u_int _svr_ip, u_int _clt_ip, u_short _svr_port, u_short _clt
 void tcp_flow::reset_seq() {
     si = -1;
     sx = -1;
-    memset(seq_down, 0, sizeof seq_down);
-    memset(seq_ts, 0, sizeof seq_ts);
+    for (int i = 0 ; i < seq_max ; i++) {
+        seq_down[i] = 0;
+        seq_ts[i] = 0;
+    }
     
     reset_ack();
     //reset ack does not need to reset seq, since seq is ahead of ack
@@ -111,8 +133,11 @@ void tcp_flow::reset_seq() {
 void tcp_flow::reset_ack() {
     ai = -1;
     ax = -1;
-    memset(ack_down, 0, sizeof ack_down);
-    memset(ack_ts, 0, sizeof ack_ts);
+    for (int i = 0 ; i < ack_max ; i++) {
+        ack_down[i] = 0;
+        ack_ts[i] = 0;
+    }
+
 }
 
 //before this function is called, need to make sure that payload_len >= 1358 (should be == 1358 actually)
@@ -417,7 +442,7 @@ short tcp_flow::find_seq_by_ack(u_int ack, short start, short end) {
     if (start <= end) {
         range = end - start + 1;
     } else {
-        range = end + SEQ_INDEX_MAX - start + 1;
+        range = end + seq_max - start + 1;
     }
     
     if (range <= 8) {
@@ -426,7 +451,7 @@ short tcp_flow::find_seq_by_ack(u_int ack, short start, short end) {
                 return i;
         }
     } else {
-        int mid = (start + range / 2) % SEQ_INDEX_MAX;
+        int mid = (start + range / 2) % seq_max;
         if (ack == seq_down[mid]) {
             //bingo!
             return mid;
@@ -441,19 +466,19 @@ short tcp_flow::find_seq_by_ack(u_int ack, short start, short end) {
 }
 
 short tcp_flow::get_si_next(short c) {
-    return (c + 1) % SEQ_INDEX_MAX;
+    return (c + 1) % seq_max;
 }
 
 short tcp_flow::get_si_previous(short c) {
-    return (c - 1 + SEQ_INDEX_MAX) % SEQ_INDEX_MAX;
+    return (c - 1 + seq_max) % seq_max;
 }
 
 short tcp_flow::get_ai_next(short c) {
-    return (c + 1) % ACK_INDEX_MAX;
+    return (c + 1) % ack_max;
 }
 
 short tcp_flow::get_ai_previous(short c) {
-    return (c - 1 + ACK_INDEX_MAX) % ACK_INDEX_MAX;
+    return (c - 1 + ack_max) % ack_max;
 }
 
 void tcp_flow::print(u_short processed_flags) {
@@ -486,4 +511,11 @@ void tcp_flow::print(u_short processed_flags) {
            gval, //22
            slow_start_count //23
            );    
+}
+
+tcp_flow::~tcp_flow() {
+    delete seq_down;
+    delete seq_ts;
+    delete ack_down;
+    delete ack_ts;
 }

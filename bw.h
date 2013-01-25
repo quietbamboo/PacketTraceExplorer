@@ -36,15 +36,17 @@ public:
     double idle_time;
     double syn_rtt, syn_ack_rtt;
     
+    u_short seq_max;
     short si; //circular seq index 0 - 19, point to the current last element
     short sx; // point to the current first index
-    u_int seq_down[SEQ_INDEX_MAX]; //circular arrary, seq_down[si] is the last packet
-    double seq_ts[SEQ_INDEX_MAX]; //corresponding time
+    u_int *seq_down;//[SEQ_INDEX_MAX]; //circular arrary, seq_down[si] is the last packet
+    double *seq_ts;//[SEQ_INDEX_MAX]; //corresponding time
     
+    u_short ack_max;
     short ai; //circular ack index 0 - 9
     short ax; // point to the current first index
-    u_int ack_down[ACK_INDEX_MAX]; //circular arrary
-    double ack_ts[ACK_INDEX_MAX]; //corresponding time
+    u_int *ack_down;//[ACK_INDEX_MAX]; //circular arrary
+    double *ack_ts;//[ACK_INDEX_MAX]; //corresponding time
     
     bool has_ts_option_clt;
     bool has_ts_option_svr;
@@ -67,6 +69,8 @@ public:
     tcp_flow();
     tcp_flow(u_int _svr_ip, u_int _clt_ip, u_short _svr_port, u_short _clt_port, double _start_time);
     
+    void init(int sm);
+    
     //called during init or any abnormal happens
     void reset_seq();
     void reset_ack();
@@ -87,6 +91,7 @@ public:
     short get_ai_next(short c);
     short get_ai_previous(short c);
     void print(u_short processed_flags);
+    ~tcp_flow();
 };
 
 #endif /* defined(__PacketTraceExplorer__bw__) */
