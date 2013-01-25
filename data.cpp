@@ -35,6 +35,7 @@ u_short port_clt, port_svr;
 u_short payload_len;
 double ts;
 double last_prune_time;
+double last_sample_time;
 double ack_delay;
 u_int expected_ack;
 u_int *opt_ts;
@@ -46,12 +47,16 @@ __gnu_cxx::hash_map<u_int, u_int>::iterator itmap;
 
 map<uint64, tcp_flow>::iterator flow_it;
 map<uint64, tcp_flow>::iterator flow_it_tmp;
-map<uint64, tcp_flow> client_flows; //only sample 1 flow for each client
+map<uint64, tcp_flow> client_flows;
 map<string, pair<double, double> > big_flows;
 map<string, double> gval; // g value
 map<string, u_int> u_int_start;
 map<string, double> double_start;
 map<string, pair<double, double> >::iterator big_flow_it_tmp;
+
+map<u_int, map<u_short, tcp_flow*> > user_flows;
+map<u_int, map<u_short, tcp_flow*> >::iterator user_it;
+map<u_short, tcp_flow*>::iterator uval_it;
 
 map<u_int, u_int> cip;
 map<u_int, u_int> sip;
@@ -192,6 +197,21 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     sip[ip_svr]++;
                     break;*/
                     
+                    //dump concurrency results
+                    if (ts - last_sample_time > 100.0) {
+                        last_sample_time = ts;
+                        for (user_it = user_flows.begin() ; user_it != user_flows.end() ; user_it++) {
+                            //for each user
+                            int concurrency = 0;
+                            for (uval_it = (*user_it).second.begin() ; uval_it != (*user_it).second.end() ; uval_it++) {
+                                if (uval_it->second->last_byte_time > ts - 5.0)
+                                    concurrency++;
+                            }
+                            if (concurrency > 0)
+                                printf("CC %.4lf %d\n", ts, concurrency);
+                        }
+                    }
+                    
                     //sequence number ACK number plot
                     /*bool isUplink = true;
                     if (RUNNING_LOCATION == RLOC_CONTROL_SERVER) {
@@ -263,12 +283,6 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     }//
                     break;//*/
                     
-                    //big flow analysis
-                    big_flow_index = ConvertIPToString(ip_clt) + string("_");
-                    big_flow_index += ConvertIPToString(ip_svr) + string("_");
-                    big_flow_index += NumberToString(port_clt) + string("_");
-                    big_flow_index += NumberToString(port_svr);
-                    
                     //dump interested flow
                     /*if (//big_flow_index.compare("10.134.12.177_96.17.164.36_1556_1935") == 0 ||
                         //big_flow_index.compare("10.34.229.236_90.84.51.8_40214_80") == 0 ||
@@ -292,6 +306,13 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         //found flow
                     } else if (flow_it_tmp == client_flows.end() && (ptcp->th_flags & TH_SYN) != 0 && (b1 && !b2)) {
                         //no flow found, now uplink SYN packet
+                        
+                        //big flow analysis
+                        big_flow_index = ConvertIPToString(ip_clt) + string("_");
+                        big_flow_index += ConvertIPToString(ip_svr) + string("_");
+                        big_flow_index += NumberToString(port_clt) + string("_");
+                        big_flow_index += NumberToString(port_svr);
+                        
                         gval[big_flow_index] = -1.0;
                         double_start[big_flow_index] = -1.0;
                         u_int_start[big_flow_index] = 0;
@@ -310,10 +331,11 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         flow_count++;
                         
                         flow = &client_flows[flow_index];
+                        user_flows[ip_clt][port_clt] = flow;
                         if (is_target_flow) {
                             flow->init(SEQ_INDEX_MAX);
                         } else {
-                            flow->init(6);
+                            flow->init(100);
                         }
                         flow->svr_ip = ip_svr;
                         flow->clt_port = port_clt;
@@ -329,8 +351,10 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                                 for (flow_it = client_flows.begin() ; flow_it != client_flows.end() ; ) {
                                     flow_it_tmp = flow_it;
                                     flow_it++;
-                                    if (flow_it_tmp->second.end_time < ts - FLOW_MAX_IDLE_TIME)
+                                    if (flow_it_tmp->second.end_time < ts - FLOW_MAX_IDLE_TIME) {
+                                        user_flows[flow_it_tmp->second.clt_ip].erase(flow_it_tmp->second.clt_port);
                                         client_flows.erase(flow_it_tmp);
+                                    }
                                 }//*/
                             }
                         }//*/
@@ -349,6 +373,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         
                         flow->print((ptcp->th_flags & TH_FIN) | (ptcp->th_flags & TH_RST));
                         //delete this flow
+                        user_flows[ip_clt].erase(port_clt);
                         client_flows.erase(flow_index);
                         
                     } else { // all packets of this flow goes to here except for the FIN and RST packets
@@ -391,6 +416,12 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     
                     
                     /*//BWE analysis
+                     //big flow analysis, need to take care about when to assign big_flow_index
+                     big_flow_index = ConvertIPToString(ip_clt) + string("_");
+                     big_flow_index += ConvertIPToString(ip_svr) + string("_");
+                     big_flow_index += NumberToString(port_clt) + string("_");
+                     big_flow_index += NumberToString(port_svr);
+                     
                     if (gval[big_flow_index] < 0) {
                         //do G inference for BW estimate
                         if (b1 && !b2) { // uplink
@@ -603,6 +634,7 @@ int init_global() {
     enb_load.clear();
     client_flows.clear();
     last_prune_time = 0;
+    last_sample_time = 0;
     cip.clear();
     sip.clear();
     

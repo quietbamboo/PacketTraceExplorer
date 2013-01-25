@@ -248,7 +248,7 @@ void tcp_flow::update_seq_x(u_int seq, u_short payload_len, double ts) {
                 if (first_bw > 0 && bw / first_bw > 1.5) {
                     slow_start_count++;
                 }
-                cout << "SSBW " << bw / first_bw << " " << bw << " " << dup_ack_count_current << endl;
+                printf("SSBW %.4lf %.4lf %d\n", bw / first_bw, bw, dup_ack_count_current);
                 dup_ack_count_current = 0;
                 bytes_after_dupack = 0;
                 first_bw = 0;
@@ -271,7 +271,7 @@ void tcp_flow::update_seq_x(u_int seq, u_short payload_len, double ts) {
     
     if (payload_len > 0 && ts - last_time > IDLE_THRESHOLD) {
         idle_time += (ts - last_time);
-        cout << "I " << (ts - last_time) << " D" << endl;
+        printf("I %.4lf D\n", ts - last_time);
     }
     
     if (packet_count == 1) {
@@ -325,7 +325,7 @@ void tcp_flow::update_ack_x(u_int ack, u_short payload_len, double _actual_ts) {
     }
     if (payload_len > 0 && _actual_ts - last_time > IDLE_THRESHOLD) {
         idle_time += (_actual_ts - last_time);
-        cout << "I " << (_actual_ts - last_time) << " U" << endl;
+        printf("I %.4lf U\n", _actual_ts - last_time);
     }
     
     if (packet_count == 1) {
