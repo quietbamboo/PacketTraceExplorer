@@ -66,7 +66,7 @@ int main(int argc, const char * argv[]) {
             //test_file = "/Users/hjx/Documents/trace_explorer/backup/test/sample.pcap";
             //test_file = "/Users/hjx/Documents/trace_explorer/dupack.pcap";
             //test_file = "/Users/hjx/Documents/trace_explorer/t1012.0008.pcap.hdr.pcap";
-            test_file = "/Users/hjx/Documents/trace_explorer/dupack2.pcap";
+            test_file = "/Users/hjx/Documents/trace_explorer/dupack.pcap";
             break;
         case RLOC_CONTROL_SERVER:
             test_file = "/Users/hjx/Documents/trace_explorer/user_target.pcap";

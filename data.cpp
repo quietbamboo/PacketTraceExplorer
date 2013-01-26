@@ -39,6 +39,7 @@ double last_sample_time;
 double ack_delay;
 u_int expected_ack;
 u_int *opt_ts;
+u_short opt_len;
 
 __gnu_cxx::hash_set<u_int> enb_ip;
 __gnu_cxx::hash_set<u_int> core_ip;
@@ -51,8 +52,8 @@ map<uint64, tcp_flow> client_flows;
 map<string, pair<double, double> > big_flows;
 map<string, pair<double, double> >::iterator big_flow_it_tmp;
 
-map<u_int, map<u_short, tcp_flow*> > user_flows;
-map<u_int, map<u_short, tcp_flow*> >::iterator user_it;
+map<u_int, user> users;
+map<u_int, user>::iterator user_it;
 map<u_short, tcp_flow*>::iterator uval_it;
 
 map<u_int, u_int> cip;
@@ -63,6 +64,7 @@ uint64 flow_index;
 string big_flow_index;
 bool is_target_flow;
 tcp_flow *flow = NULL;
+user *userp = NULL;
 client_bw *bw_udp = NULL;
 client_bw *bw_tcp = NULL;
 char *payload;
@@ -92,6 +94,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
     
     peth = (att_ether_hdr *)pkt_data;
     if (*((u_short *)(pkt_data + ETHER_HDR_LEN - 2)) == ETHERTYPE_IP) {
+        //all IP
         pip = (ip *)(pkt_data + ETHER_HDR_LEN);
         b1 = isClient(pip->ip_src);
         b2 = isClient(pip->ip_dst);
@@ -99,11 +102,16 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
             if (b1 && !b2) { // uplink
                 ip1 = peth->src_ip;
                 ip2 = peth->dst_ip;
+                
+                ip_clt = pip->ip_src.s_addr;
+                ip_svr = pip->ip_dst.s_addr;    
             } else { //downlink
                 ip1 = peth->dst_ip;
                 ip2 = peth->src_ip;
+                
+                ip_clt = pip->ip_dst.s_addr;
+                ip_svr = pip->ip_src.s_addr;
             }
-            
             //enb_ip.insert(ip1);
             //core_ip.insert(ip2);
             /* //ENB load info
@@ -123,6 +131,13 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
             ignore_count2++;
         }
         
+        //init userp
+        userp = &users[ip_clt];
+        if (userp->start_time == 0) {
+            //init
+            userp->start_time = ts;
+        }
+        
         switch (pip->ip_p) {
             case IPPROTO_TCP:
                 
@@ -131,6 +146,20 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                 tcp_count++;
                 ptcp = (tcphdr *)((u_char *)pip + BYTES_PER_32BIT_WORD * pip->ip_hl); //cast of u_char* is necessary
                 payload_len = bswap16(pip->ip_len) - BYTES_PER_32BIT_WORD * (pip->ip_hl + ptcp->th_off);
+                
+                //find where timestamps options is
+                opt_len = BYTES_PER_32BIT_WORD * ptcp->th_off - 20;
+                opt_ts = (u_int *)((u_char *)ptcp + 20);
+                while (opt_len >= 10) { //Timestamps option at least 10 bytes
+                    if ((*((u_char *)opt_ts)) == 0x08 && (*(((u_char *)opt_ts) + 1)) == 0x0a) {
+                        opt_ts = (u_int *)((u_char *)opt_ts + 2);
+                        opt_len = 100;
+                        break;
+                    }
+                    opt_ts = (u_int *)((u_char *)opt_ts + 1);
+                    opt_len--;
+                }
+                
                 
                 if (RUNNING_LOCATION == RLOC_CONTROL_CLIENT) {
                     //TCP client side throughput sampling
@@ -176,13 +205,9 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                            RUNNING_LOCATION == RLOC_ATT_CLIENT ||
                            RUNNING_LOCATION == RLOC_CONTROL_SERVER) {
                     if (b1 && !b2) { // uplink
-                        ip_clt = pip->ip_src.s_addr;
-                        ip_svr = pip->ip_dst.s_addr;
                         port_clt = bswap16(ptcp->th_sport);
                         port_svr = bswap16(ptcp->th_dport);
                     } else if (!b1 && b2) { //downlink
-                        ip_clt = pip->ip_dst.s_addr;
-                        ip_svr = pip->ip_src.s_addr;
                         port_clt = bswap16(ptcp->th_dport);
                         port_svr = bswap16(ptcp->th_sport);
                     } else {
@@ -197,10 +222,10 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     //dump concurrency results
                     if (ts - last_sample_time > 100.0) {
                         last_sample_time = ts;
-                        for (user_it = user_flows.begin() ; user_it != user_flows.end() ; user_it++) {
+                        for (user_it = users.begin() ; user_it != users.end() ; user_it++) {
                             //for each user
                             int concurrency = 0;
-                            for (uval_it = (*user_it).second.begin() ; uval_it != (*user_it).second.end() ; uval_it++) {
+                            for (uval_it = (*user_it).second.tcp_flows.begin() ; uval_it != (*user_it).second.tcp_flows.end() ; uval_it++) {
                                 if (uval_it->second->last_byte_time > ts - 1.0)
                                     concurrency++;
                             }
@@ -328,8 +353,8 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         flow_count++;
                         
                         flow = &client_flows[flow_index];
-                        user_flows[ip_clt][port_clt] = flow;
-                        
+                        userp->tcp_flows[port_clt] = flow;
+                        flow->idle_time_before_syn = ts - userp->last_packet_time;
                         flow->svr_ip = ip_svr;
                         flow->clt_port = port_clt;
                         flow->svr_port = port_svr;
@@ -347,7 +372,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                                     if (flow_it_tmp->second.end_time < ts - FLOW_MAX_IDLE_TIME) {
                                         //delete a flow
                                         flow_it_tmp->second.print(-1 * ptcp->th_flags);
-                                        user_flows[flow_it_tmp->second.clt_ip].erase(flow_it_tmp->second.clt_port);
+                                        users[flow_it_tmp->second.clt_ip].tcp_flows.erase(flow_it_tmp->second.clt_port);
                                         client_flows.erase(flow_it_tmp);
                                     }
                                 }//*/
@@ -369,7 +394,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     if ((ptcp->th_flags & TH_FIN) != 0 || (ptcp->th_flags & TH_RST) != 0) {
                         flow->print((ptcp->th_flags & TH_FIN) | (ptcp->th_flags & TH_RST));
                         //delete this flow
-                        user_flows[ip_clt].erase(port_clt);
+                        userp->tcp_flows.erase(port_clt);
                         client_flows.erase(flow_index);
                         break;
                     } else { // all packets of this flow goes to here except for the FIN and RST packets
@@ -377,9 +402,20 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                             if (payload_len > 0) {
                                 flow->total_up_payloads += payload_len;
                             }
-                            if (BYTES_PER_32BIT_WORD * ptcp->th_off == 32 || BYTES_PER_32BIT_WORD * ptcp->th_off == 40)
-                                //there is TCP timestamp options, 40 for SYN packet
+                            if (opt_len == 100) {
+                                //there is TCP timestamp options
                                 flow->has_ts_option_clt = true;
+                                
+                                if (flow->packet_count == 1) {
+                                    //SYN
+                                    flow->promotion_delay = -1 * bswap32(*opt_ts);
+                                    cout << bswap32(*opt_ts) << endl;
+                                } else if (flow->packet_count == 3) {
+                                    //ACK 3
+                                    flow->promotion_delay += bswap32(*opt_ts);
+                                                                        cout << bswap32(*opt_ts) << endl;
+                                }
+                            }
                         } else if (!b1 && b2) { //downlink
                             if (payload_len > 0) {
                                 flow->total_down_payloads += payload_len;
@@ -388,7 +424,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                                     flow->first_byte_time = ts;
                                 }
                             }
-                            if (BYTES_PER_32BIT_WORD * ptcp->th_off == 32 || BYTES_PER_32BIT_WORD * ptcp->th_off == 40) //there is TCP timestamp options
+                            if (opt_len == 100) //there is TCP timestamp options
                                 flow->has_ts_option_svr = true;
                         }
                     }
@@ -409,17 +445,15 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
 
                     }//*/
                     
-                    
                     //BWE analysis, the first part can be used for G inference only
                     if (flow->gval < 0) {
                         //do G inference for BW estimate
                         if (b1 && !b2) { // uplink
                             if ((ptcp->th_flags & TH_ACK) != 0) {
-                                opt_ts = (u_int *)((u_char *)ptcp + 24);
+
                                 if (flow->double_start < 0) {
                                     flow->u_int_start = bswap32(*opt_ts);
                                     flow->double_start = ts;
-                                    
                                     //cout << "TCP header length of the first uplink ACK " << BYTES_PER_32BIT_WORD * ptcp->th_off << endl;
                                     if (BYTES_PER_32BIT_WORD * ptcp->th_off < 32) {
                                         //no TCP timestamp options, can't use G inference and BW estimation
@@ -427,7 +461,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                                     }
                                 } else if (flow->double_start > 0 && ts - flow->double_start > GVAL_TIME) {
                                     flow->gval = (ts - flow->double_start) / (bswap32(*opt_ts) - flow->u_int_start);
-                                    cout << "G_INFER " << " t_off " << (ts - flow->double_start) << " G: " << flow->gval << " s/tick" << endl;
+                                    //cout << "G_INFER " << " t_off " << (ts - flow->double_start) << " G: " << flow->gval << " s/tick" << endl;
                                 }
                             }
                         }
@@ -437,7 +471,6 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                             port_clt == flow->clt_port && port_svr == flow->svr_port) {
                             if (b1 && !b2) { // uplink
                                 if ((ptcp->th_flags & TH_ACK) != 0) {
-                                    opt_ts = (u_int *)((u_char *)ptcp + 24);
                                     flow->update_ack(bswap32(ptcp->th_ack), payload_len, flow->gval * bswap32(*opt_ts), ts);
                                 }
                             } else if (!b1 && b2) { //downlink
@@ -452,7 +485,6 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     if (RUNNING_LOCATION == RLOC_CONTROL_SERVER) {
                         if (b1 && !b2) { // uplink
                             if ((ptcp->th_flags & TH_ACK) != 0) {
-                                opt_ts = (u_int *)((u_char *)ptcp + 24);
                                 if (flow->double_start < 0 && ts > 100) {
                                     flow->u_int_start = bswap32(*opt_ts);
                                     flow->double_start = ts;
@@ -590,6 +622,10 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
             default:
                 break;
         }
+        
+        //everything is in IP
+        userp->last_packet_time = ts;
+        
     } else {
         no_ip_count++;
         //cout << "Packet " << packet_count << " not IP " << peth->ether_type << endl;

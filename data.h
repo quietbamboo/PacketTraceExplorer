@@ -21,6 +21,7 @@
 #include "def.h"
 #include "bw.h"
 #include "client.h"
+#include "user.h"
 
 int init_global();
 int read_pcap_trace(const char * filename);

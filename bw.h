@@ -25,6 +25,7 @@ public:
     double gval;
     u_int u_int_start;
     double double_start;
+    int promotion_delay;
     
     double target;
     double bwstep;
@@ -37,6 +38,7 @@ public:
     double end_time;
     double idle_time;
     double syn_rtt, syn_ack_rtt;
+    double idle_time_before_syn;
     
     short si; //circular seq index 0 - 19, point to the current last element
     short sx; // point to the current first index

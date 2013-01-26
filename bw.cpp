@@ -24,10 +24,12 @@ tcp_flow::tcp_flow() {
 
     syn_rtt = 0;
     syn_ack_rtt = 0;
+    idle_time_before_syn = 0;
     
     gval = -1.0;
-    double_start = -1.0;
     u_int_start = 0;
+    double_start = -1.0;
+    promotion_delay = 0;
     
     has_ts_option_clt = false;
     has_ts_option_svr = false;
@@ -260,9 +262,9 @@ void tcp_flow::update_ack_x(u_int ack, u_short payload_len, double _actual_ts) {
         printf("I %.4lf U\n", _actual_ts - last_time);
     }
     
-    if (packet_count == 1) {
+    if (packet_count == 2) {
         syn_rtt = _actual_ts - last_time;
-    } else if (packet_count == 2) {
+    } else if (packet_count == 3) {
         syn_ack_rtt = _actual_ts - last_time;
     }
     last_time = _actual_ts;
@@ -415,7 +417,7 @@ void tcp_flow::print(u_short processed_flags) {
         avg_bw = (double)(total_bw / (double)sample_count);
 
     printf("%s ", ConvertIPToString(clt_ip)); // 1
-    printf("%s %d %d %.4lf %.4lf %.4lf %.4lf %d %d %d %lld %lld %.4lf %lld %.4lf %.4lf %lld %lld %.4lf %d %.4lf %d %lld\n",
+    printf("%s %d %d %.4lf %.4lf %.4lf %.4lf %d %d %d %lld %lld %.4lf %lld %.4lf %.4lf %lld %lld %.4lf %d %.4lf %d %lld %.4lf %.4lf\n",
            ConvertIPToString(svr_ip), //2
            clt_port, //3
            svr_port, //4
@@ -438,6 +440,8 @@ void tcp_flow::print(u_short processed_flags) {
            sample_count, //21
            gval, //22
            slow_start_count, //23
-           packet_count //24
+           packet_count, //24
+           promotion_delay * gval - (syn_rtt + syn_ack_rtt), //25
+           idle_time_before_syn //26
            );    
 }
