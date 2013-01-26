@@ -49,6 +49,9 @@ tcp_flow::tcp_flow() {
     slow_start_count = 1; // start from 1 initial slow start
     last_dupack_time = 0;
     bytes_after_dupack = 0;
+    
+    //HTTP analysis
+    http_request_count = 0;
 
     total_bw = 0;
     sample_count = 0;
@@ -417,7 +420,7 @@ void tcp_flow::print(u_short processed_flags) {
         avg_bw = (double)(total_bw / (double)sample_count);
 
     printf("%s ", ConvertIPToString(clt_ip)); // 1
-    printf("%s %d %d %.4lf %.4lf %.4lf %.4lf %d %d %d %lld %lld %.4lf %lld %.4lf %.4lf %lld %lld %.4lf %d %.4lf %d %lld %.4lf %.4lf\n",
+    printf("%s %d %d %.4lf %.4lf %.4lf %.4lf %d %d %d %lld %lld %.4lf %lld %.4lf %.4lf %lld %lld %.4lf %d %.4lf %d %lld %.4lf %.4lf %d\n",
            ConvertIPToString(svr_ip), //2
            clt_port, //3
            svr_port, //4
@@ -442,6 +445,7 @@ void tcp_flow::print(u_short processed_flags) {
            slow_start_count, //23
            packet_count, //24
            promotion_delay * gval - (syn_rtt + syn_ack_rtt), //25
-           idle_time_before_syn //26
+           idle_time_before_syn, //26
+           http_request_count //27
            );    
 }

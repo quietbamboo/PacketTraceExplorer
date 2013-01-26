@@ -475,9 +475,9 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                                 payload_str.find("OPTIONS ") == 0 || payload_str.find("CONNECT ") == 0 ||
                                 payload_str.find("PATCH ") == 0) {
                                 //uplink HTTP request
+                                flow->http_request_count++;
                             }
                         }
-                    
                     }
                     
                     

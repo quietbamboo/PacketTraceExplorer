@@ -67,6 +67,9 @@ public:
     u_short slow_start_count; // start from 1 initial slow start
     double last_dupack_time;
     u_int bytes_after_dupack;
+    
+    //HTTP analysis
+    u_short http_request_count;
 
     tcp_flow();
     
