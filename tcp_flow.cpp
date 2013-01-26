@@ -447,5 +447,5 @@ void tcp_flow::print(u_short processed_flags) {
            promotion_delay * gval - (syn_rtt + syn_ack_rtt), //25
            idle_time_before_syn, //26
            http_request_count //27
-           );    
+           );
 }

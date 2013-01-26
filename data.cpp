@@ -425,11 +425,9 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                                 if (flow->packet_count == 1) {
                                     //SYN
                                     flow->promotion_delay = -1 * bswap32(*opt_ts);
-                                    cout << bswap32(*opt_ts) << endl;
                                 } else if (flow->packet_count == 3) {
                                     //ACK 3
                                     flow->promotion_delay += bswap32(*opt_ts);
-                                                                        cout << bswap32(*opt_ts) << endl;
                                 }
                             }
                         } else if (!b1 && b2) { //downlink
@@ -461,7 +459,6 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
 
                     }//*/
                     
-                    
                     //HTTP analysis
                     if (ETHER_HDR_LEN + BYTES_PER_32BIT_WORD * (pip->ip_hl + ptcp->th_off) < header->caplen) {
                         //has TCP payload
@@ -479,7 +476,6 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                             }
                         }
                     }
-                    
                     
                     //BWE analysis, the first part can be used for G inference only
                     if (flow->gval < 0) {
@@ -515,7 +511,6 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                             }
                         }
                     }//*/
-                    
                     
                     /*//G inference
                     if (RUNNING_LOCATION == RLOC_CONTROL_SERVER) {
@@ -578,11 +573,9 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                 } else {
                     break;
                 }
-                
                 /*//count CS IPs
                 cip[ip_clt]++;
                 sip[ip_svr]++;*/
-
                 
                 if (RUNNING_LOCATION == RLOC_CONTROL_CLIENT) {
                     //UDP client side throughput sampling
@@ -699,7 +692,6 @@ int init_global() {
     udp_down_bytes = 0;
     http_up_bytes = 0;
     http_down_bytes = 0;
-
     
     ack_delay = -1;
     
@@ -714,7 +706,7 @@ int init_global() {
     
     big_flow_index = "default";
     big_flows.clear();
-    if (RUNNING_LOCATION == RLOC_ATT_SERVER || RUNNING_LOCATION == RLOC_ATT_CLIENT) {
+    /*if (RUNNING_LOCATION == RLOC_ATT_SERVER || RUNNING_LOCATION == RLOC_ATT_CLIENT) {
         //readin big flow data
         const char *big_flow_path;
         if (RUNNING_LOCATION == RLOC_ATT_SERVER) {
@@ -730,13 +722,13 @@ int init_global() {
             big_flows[key] = make_pair(start, duration);
             //big_flows[key] = pair<double, double>(start, duration); //the same
         }
-    }
+    }//*/
     cout << "BIG_FLOWS size " << big_flows.size() << endl;
     
     //dump interest.pcap
     pcap_t *px = pcap_open_dead(DLT_EN10MB, 64);
     dumper = pcap_dump_open(px, "interest.pcap");
-    
+
     SAMPLES = 0;
 }
 
