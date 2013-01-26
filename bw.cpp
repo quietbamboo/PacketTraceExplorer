@@ -21,9 +21,13 @@ tcp_flow::tcp_flow() {
     bwstep = 0.25;
     last_time = -1;
     last_throughput = -1;
-    gval = 0;
+
     syn_rtt = 0;
     syn_ack_rtt = 0;
+    
+    gval = -1.0;
+    double_start = -1.0;
+    u_int_start = 0;
     
     has_ts_option_clt = false;
     has_ts_option_svr = false;
@@ -47,82 +51,16 @@ tcp_flow::tcp_flow() {
     total_bw = 0;
     sample_count = 0;
     
-    init(0);
+    reset_seq(); //contains reset_ack
 }
 
-//should only be called called by SYN packet
-tcp_flow::tcp_flow(u_int _svr_ip, u_int _clt_ip, u_short _svr_port, u_short _clt_port, double _start_time) {
-    svr_ip = _svr_ip;
-    clt_ip = _clt_ip;
-    svr_port = _svr_port;
-    clt_port = _clt_port;
-    start_time = _start_time;
-    end_time = start_time;
-    idle_time = 0;
-    
-    target = start_time + GVAL_TIME;
-    bwstep = 0.25;
-    last_time = -1;
-    last_throughput = -1;
-    gval = 0;
-    syn_rtt = 0;
-    syn_ack_rtt = 0;
-    
-    has_ts_option_clt = false;
-    has_ts_option_svr = false;
-    first_byte_time = 0;
-    last_byte_time = 0;
-    
-    total_down_payloads = 0;
-    total_up_payloads = 0;
-    bytes_in_fly = 0;
-    max_bytes_in_fly = 0;
-    packet_count = 0;
-    dup_ack_count = 0;
-    outorder_seq_count = 0;
-    
-    first_bw = 0;
-    dup_ack_count_current = 0;
-    slow_start_count = 1; // start from 1 initial slow start
-    last_dupack_time = 0;
-    bytes_after_dupack = 0;
-    
-    total_bw = 0;
-    sample_count = 0;
-    
-    init(0);
-}
-
-void tcp_flow::init(int sm) {
-    if (sm == 0) {
-        seq_down = NULL;
-        seq_ts = NULL;
-        seq_max = 0;
-        ack_down = NULL;
-        ack_ts = NULL;
-        ack_max = 0;
-        return;
-    }
-    
-    seq_down = new u_int[sm];
-    seq_ts = new double[sm];
-    seq_max = sm;
-    ack_down = new u_int[sm / 2];
-    ack_ts = new double[sm / 2];
-    ack_max = sm / 2;
-    
-    reset_seq();
-    reset_ack();
-}
 
 //called during init or any abnormal happens
 void tcp_flow::reset_seq() {
     si = -1;
     sx = -1;
-    for (int i = 0 ; i < seq_max ; i++) {
-        seq_down[i] = 0;
-        seq_ts[i] = 0;
-    }
+    memset(seq_down, 0, sizeof seq_down);
+    memset(seq_ts, 0, sizeof seq_ts);
     
     reset_ack();
     //reset ack does not need to reset seq, since seq is ahead of ack
@@ -133,11 +71,8 @@ void tcp_flow::reset_seq() {
 void tcp_flow::reset_ack() {
     ai = -1;
     ax = -1;
-    for (int i = 0 ; i < ack_max ; i++) {
-        ack_down[i] = 0;
-        ack_ts[i] = 0;
-    }
-
+    memset(ack_down, 0, sizeof ack_down);
+    memset(ack_ts, 0, sizeof ack_ts);
 }
 
 //before this function is called, need to make sure that payload_len >= 1358 (should be == 1358 actually)
@@ -235,7 +170,7 @@ void tcp_flow::update_seq_x(u_int seq, u_short payload_len, double ts) {
     
     if (payload_len > 0) {
         //Slow start after dup ack
-        if (dup_ack_count_current > 50) {
+        if (dup_ack_count_current > 20) {
             bytes_after_dupack += payload_len;
             if (first_bw == 0 && ts - last_dupack_time > DUPACK_SLOWSTART_TIME && ts - last_dupack_time <= 2 * DUPACK_SLOWSTART_TIME) {
                 //this is the time to output a throughput sample
@@ -274,21 +209,18 @@ void tcp_flow::update_seq_x(u_int seq, u_short payload_len, double ts) {
         printf("I %.4lf D\n", ts - last_time);
     }
     
-    if (packet_count == 1) {
+    if (packet_count == 2) {
         syn_rtt = ts - last_time;
-    } else if (packet_count == 2) {
+    } else if (packet_count == 3) {
         syn_ack_rtt = ts - last_time;
     }
-    
     last_time = ts;
-    packet_count++;
 }
 
 void tcp_flow::update_ack_x(u_int ack, u_short payload_len, double _actual_ts) {
     if (ai != -1 && ack_down[ai] > 0 && ack_down[ai] == ack && payload_len == 0) {
         //if payload not 0, this is uplink data packet
         dup_ack_count++;
-        
         if (_actual_ts - last_dupack_time > 1.0) {
             //new session
             dup_ack_count_current = 1;
@@ -309,11 +241,11 @@ void tcp_flow::update_ack_x(u_int ack, u_short payload_len, double _actual_ts) {
         ax = get_ai_next(ai);
     }
     
-    //ACK RTT analysis
+    /*//ACK RTT analysis
     short s1 = find_seq_by_ack(ack_down[ai], sx, si);
     if (s1 != -1 && payload_len == 0) {
-        //cout << "AR " << " " << ack_ts[ai] - seq_ts[s1] << " " << bytes_in_fly << endl;
-    }
+        cout << "AR " << " " << ack_ts[ai] - seq_ts[s1] << " " << bytes_in_fly << endl;
+    }//*/
     
     //update bytes in fly after analysis
     if (bytes_in_fly > 0) {
@@ -333,15 +265,11 @@ void tcp_flow::update_ack_x(u_int ack, u_short payload_len, double _actual_ts) {
     } else if (packet_count == 2) {
         syn_ack_rtt = _actual_ts - last_time;
     }
-
     last_time = _actual_ts;
-    packet_count++;
 }
-
 
 //test with start_ai and ai
 bool tcp_flow::bw_estimate(short start_ai) {
-    
     if (ack_down[start_ai] - ack_down[get_ai_previous(start_ai)] <= 1.1 * TCP_MAX_PAYLOAD) {
         return false; //this ack is triggered by TCP's delayed ACK
     }
@@ -442,7 +370,7 @@ short tcp_flow::find_seq_by_ack(u_int ack, short start, short end) {
     if (start <= end) {
         range = end - start + 1;
     } else {
-        range = end + seq_max - start + 1;
+        range = end + SEQ_INDEX_MAX - start + 1;
     }
     
     if (range <= 8) {
@@ -451,7 +379,7 @@ short tcp_flow::find_seq_by_ack(u_int ack, short start, short end) {
                 return i;
         }
     } else {
-        int mid = (start + range / 2) % seq_max;
+        int mid = (start + range / 2) % SEQ_INDEX_MAX;
         if (ack == seq_down[mid]) {
             //bingo!
             return mid;
@@ -466,19 +394,19 @@ short tcp_flow::find_seq_by_ack(u_int ack, short start, short end) {
 }
 
 short tcp_flow::get_si_next(short c) {
-    return (c + 1) % seq_max;
+    return (c + 1) % SEQ_INDEX_MAX;
 }
 
 short tcp_flow::get_si_previous(short c) {
-    return (c - 1 + seq_max) % seq_max;
+    return (c - 1 + SEQ_INDEX_MAX) % SEQ_INDEX_MAX;
 }
 
 short tcp_flow::get_ai_next(short c) {
-    return (c + 1) % ack_max;
+    return (c + 1) % ACK_INDEX_MAX;
 }
 
 short tcp_flow::get_ai_previous(short c) {
-    return (c - 1 + ack_max) % ack_max;
+    return (c - 1 + ACK_INDEX_MAX) % ACK_INDEX_MAX;
 }
 
 void tcp_flow::print(u_short processed_flags) {
@@ -487,7 +415,7 @@ void tcp_flow::print(u_short processed_flags) {
         avg_bw = (double)(total_bw / (double)sample_count);
 
     printf("%s ", ConvertIPToString(clt_ip)); // 1
-    printf("%s %d %d %.4lf %.4lf %.4lf %.4lf %d %d %d %lld %lld %.4lf %lld %.4lf %.4lf %lld %lld %.4lf %d %.4lf %d\n",
+    printf("%s %d %d %.4lf %.4lf %.4lf %.4lf %d %d %d %lld %lld %.4lf %lld %.4lf %.4lf %lld %lld %.4lf %d %.4lf %d %lld\n",
            ConvertIPToString(svr_ip), //2
            clt_port, //3
            svr_port, //4
@@ -509,13 +437,7 @@ void tcp_flow::print(u_short processed_flags) {
            avg_bw, //20
            sample_count, //21
            gval, //22
-           slow_start_count //23
+           slow_start_count, //23
+           packet_count //24
            );    
-}
-
-tcp_flow::~tcp_flow() {
-    delete seq_down;
-    delete seq_ts;
-    delete ack_down;
-    delete ack_ts;
 }

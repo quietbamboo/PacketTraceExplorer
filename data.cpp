@@ -49,9 +49,6 @@ map<uint64, tcp_flow>::iterator flow_it;
 map<uint64, tcp_flow>::iterator flow_it_tmp;
 map<uint64, tcp_flow> client_flows;
 map<string, pair<double, double> > big_flows;
-map<string, double> gval; // g value
-map<string, u_int> u_int_start;
-map<string, double> double_start;
 map<string, pair<double, double> >::iterator big_flow_it_tmp;
 
 map<u_int, map<u_short, tcp_flow*> > user_flows;
@@ -204,7 +201,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                             //for each user
                             int concurrency = 0;
                             for (uval_it = (*user_it).second.begin() ; uval_it != (*user_it).second.end() ; uval_it++) {
-                                if (uval_it->second->last_byte_time > ts - 5.0)
+                                if (uval_it->second->last_byte_time > ts - 1.0)
                                     concurrency++;
                             }
                             if (concurrency > 0)
@@ -307,15 +304,11 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     } else if (flow_it_tmp == client_flows.end() && (ptcp->th_flags & TH_SYN) != 0 && (b1 && !b2)) {
                         //no flow found, now uplink SYN packet
                         
-                        //big flow analysis
+                        /*//big flow analysis
                         big_flow_index = ConvertIPToString(ip_clt) + string("_");
                         big_flow_index += ConvertIPToString(ip_svr) + string("_");
                         big_flow_index += NumberToString(port_clt) + string("_");
                         big_flow_index += NumberToString(port_svr);
-                        
-                        gval[big_flow_index] = -1.0;
-                        double_start[big_flow_index] = -1.0;
-                        u_int_start[big_flow_index] = 0;
                         
                         big_flow_it_tmp = big_flows.find(big_flow_index);
                         is_target_flow = false;
@@ -326,17 +319,17 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                                 is_target_flow = true;
                             }
                         }
+                        if (!is_target_flow) {
+                            break;
+                        }
+                        //*/
                         
                         client_flows[flow_index].clt_ip = ip_clt; //init a flow
                         flow_count++;
                         
                         flow = &client_flows[flow_index];
                         user_flows[ip_clt][port_clt] = flow;
-                        if (is_target_flow) {
-                            flow->init(SEQ_INDEX_MAX);
-                        } else {
-                            flow->init(100);
-                        }
+                        
                         flow->svr_ip = ip_svr;
                         flow->clt_port = port_clt;
                         flow->svr_port = port_svr;
@@ -352,6 +345,8 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                                     flow_it_tmp = flow_it;
                                     flow_it++;
                                     if (flow_it_tmp->second.end_time < ts - FLOW_MAX_IDLE_TIME) {
+                                        //delete a flow
+                                        flow_it_tmp->second.print(-1 * ptcp->th_flags);
                                         user_flows[flow_it_tmp->second.clt_ip].erase(flow_it_tmp->second.clt_port);
                                         client_flows.erase(flow_it_tmp);
                                     }
@@ -368,14 +363,15 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     
                     flow = &client_flows[flow_index];
                     flow->end_time = ts;
+                    flow->packet_count++; //should be before the SYN-RTT analysis
+                    
                     //if a terminate flow packet is here, terminate flow and output flow statistics
                     if ((ptcp->th_flags & TH_FIN) != 0 || (ptcp->th_flags & TH_RST) != 0) {
-                        
                         flow->print((ptcp->th_flags & TH_FIN) | (ptcp->th_flags & TH_RST));
                         //delete this flow
                         user_flows[ip_clt].erase(port_clt);
                         client_flows.erase(flow_index);
-                        
+                        break;
                     } else { // all packets of this flow goes to here except for the FIN and RST packets
                         if (b1 && !b2) { // uplink
                             if (payload_len > 0) {
@@ -414,43 +410,35 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     }//*/
                     
                     
-                    
-                    /*//BWE analysis
-                     //big flow analysis, need to take care about when to assign big_flow_index
-                     big_flow_index = ConvertIPToString(ip_clt) + string("_");
-                     big_flow_index += ConvertIPToString(ip_svr) + string("_");
-                     big_flow_index += NumberToString(port_clt) + string("_");
-                     big_flow_index += NumberToString(port_svr);
-                     
-                    if (gval[big_flow_index] < 0) {
+                    //BWE analysis, the first part can be used for G inference only
+                    if (flow->gval < 0) {
                         //do G inference for BW estimate
                         if (b1 && !b2) { // uplink
                             if ((ptcp->th_flags & TH_ACK) != 0) {
                                 opt_ts = (u_int *)((u_char *)ptcp + 24);
-                                if (double_start[big_flow_index] < 0) {
-                                    u_int_start[big_flow_index] = bswap32(*opt_ts);
-                                    double_start[big_flow_index] = ts;
+                                if (flow->double_start < 0) {
+                                    flow->u_int_start = bswap32(*opt_ts);
+                                    flow->double_start = ts;
                                     
                                     //cout << "TCP header length of the first uplink ACK " << BYTES_PER_32BIT_WORD * ptcp->th_off << endl;
                                     if (BYTES_PER_32BIT_WORD * ptcp->th_off < 32) {
                                         //no TCP timestamp options, can't use G inference and BW estimation
-                                        double_start[big_flow_index] = -1.0;
+                                        flow->double_start = -1.0;
                                     }
-                                } else if (double_start[big_flow_index] > 0 && ts - double_start[big_flow_index] > GVAL_TIME) {
-                                    gval[big_flow_index] = (ts - double_start[big_flow_index]) / (bswap32(*opt_ts) - u_int_start[big_flow_index]);
-                                    cout << "G_INFER " << big_flow_index << " infered time offset " << (ts - double_start[big_flow_index]) << " G: " << gval[big_flow_index] << " seconds/tick" << endl;
-                                    flow->gval = gval[big_flow_index];
+                                } else if (flow->double_start > 0 && ts - flow->double_start > GVAL_TIME) {
+                                    flow->gval = (ts - flow->double_start) / (bswap32(*opt_ts) - flow->u_int_start);
+                                    cout << "G_INFER " << " t_off " << (ts - flow->double_start) << " G: " << flow->gval << " s/tick" << endl;
                                 }
                             }
                         }
-                    } else {
+                    }/* else {
                         //do BW estimation
                         if (ip_clt == flow->clt_ip && ip_svr == flow->svr_ip &&
                             port_clt == flow->clt_port && port_svr == flow->svr_port) {
                             if (b1 && !b2) { // uplink
                                 if ((ptcp->th_flags & TH_ACK) != 0) {
                                     opt_ts = (u_int *)((u_char *)ptcp + 24);
-                                    flow->update_ack(bswap32(ptcp->th_ack), payload_len, gval[big_flow_index] * bswap32(*opt_ts), ts);
+                                    flow->update_ack(bswap32(ptcp->th_ack), payload_len, flow->gval * bswap32(*opt_ts), ts);
                                 }
                             } else if (!b1 && b2) { //downlink
                                 //payload_len > < 0 check inside update_seq
@@ -465,13 +453,13 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         if (b1 && !b2) { // uplink
                             if ((ptcp->th_flags & TH_ACK) != 0) {
                                 opt_ts = (u_int *)((u_char *)ptcp + 24);
-                                if (double_start[big_flow_index] < 0 && ts > 100) {
-                                    u_int_start[big_flow_index] = bswap32(*opt_ts);
-                                    double_start[big_flow_index] = ts;
-                                } else if (double_start[big_flow_index] > 0) {
-                                    gval[big_flow_index] = (ts - double_start[big_flow_index]) / (bswap32(*opt_ts) - u_int_start[big_flow_index]);
+                                if (flow->double_start < 0 && ts > 100) {
+                                    flow->u_int_start = bswap32(*opt_ts);
+                                    flow->double_start = ts;
+                                } else if (flow->double_start > 0) {
+                                    flow->gval = (ts - flow->double_start) / (bswap32(*opt_ts) - flow->u_int_start);
                                     if (packet_count % 3 == 0)
-                                        cout << "G_INFERENCE " << (ts - double_start[big_flow_index]) << " " << gval[big_flow_index] << endl;
+                                        cout << "G_INFERENCE " << (ts - flow->double_start) << " " << flow->gval << endl;
                                 }
                             }
                         }
@@ -640,9 +628,6 @@ int init_global() {
     
     big_flow_index = "default";
     big_flows.clear();
-    gval.clear();
-    u_int_start.clear();
-    double_start.clear();
     if (RUNNING_LOCATION == RLOC_ATT_SERVER || RUNNING_LOCATION == RLOC_ATT_CLIENT) {
         //readin big flow data
         const char *big_flow_path;
