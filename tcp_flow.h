@@ -1,13 +1,13 @@
 //
-//  bw.h
+//  tcp_flow.h
 //  PacketTraceExplorer
 //
 //  Created by Junxian Huang on 12/1/12.
 //  Copyright (c) 2012 Junxian Huang. All rights reserved.
 //
 
-#ifndef __PacketTraceExplorer__bw__
-#define __PacketTraceExplorer__bw__
+#ifndef __PacketTraceExplorer__tcp_flow__
+#define __PacketTraceExplorer__tcp_flow__
 
 #include "util.h"
 #include "def.h"
@@ -92,4 +92,4 @@ public:
     void print(u_short processed_flags);
 };
 
-#endif /* defined(__PacketTraceExplorer__bw__) */
+#endif /* defined(__PacketTraceExplorer__tcp_flow__) */

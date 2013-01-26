@@ -19,7 +19,7 @@
 #include "pcap.h" //in the server, pcap is not in system path
 #include "util.h"
 #include "def.h"
-#include "bw.h"
+#include "tcp_flow.h"
 #include "client.h"
 #include "user.h"
 

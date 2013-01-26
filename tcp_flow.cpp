@@ -1,12 +1,12 @@
 //
-//  bw.cpp
+//  tcp_flow.cpp
 //  PacketTraceExplorer
 //
 //  Created by Junxian Huang on 12/1/12.
 //  Copyright (c) 2012 Junxian Huang. All rights reserved.
 //
 
-#include "bw.h"
+#include "tcp_flow.h"
 
 tcp_flow::tcp_flow() {
     svr_ip = 0;

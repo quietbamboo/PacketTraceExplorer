@@ -16,6 +16,12 @@ uint64 packet_count;
 uint64 no_ip_count;
 uint64 tcp_count;
 uint64 udp_count;
+uint64 tcp_up_bytes;
+uint64 tcp_down_bytes;
+uint64 udp_up_bytes;
+uint64 udp_down_bytes;
+uint64 http_up_bytes;
+uint64 http_down_bytes;
 uint64 icmp_count;
 uint64 ignore_count1;
 uint64 ignore_count2;
@@ -207,9 +213,19 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     if (b1 && !b2) { // uplink
                         port_clt = bswap16(ptcp->th_sport);
                         port_svr = bswap16(ptcp->th_dport);
+                        
+                        tcp_up_bytes += payload_len;
+                        if (port_svr == 80 || port_svr == 8080) {
+                            http_up_bytes += payload_len;
+                        }
                     } else if (!b1 && b2) { //downlink
                         port_clt = bswap16(ptcp->th_dport);
                         port_svr = bswap16(ptcp->th_sport);
+
+                        tcp_down_bytes += payload_len;
+                        if (port_svr == 80 || port_svr == 8080) {
+                            http_down_bytes += payload_len;
+                        }
                     } else {
                         break;
                     }
@@ -445,6 +461,26 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
 
                     }//*/
                     
+                    
+                    //HTTP analysis
+                    if (ETHER_HDR_LEN + BYTES_PER_32BIT_WORD * (pip->ip_hl + ptcp->th_off) < header->caplen) {
+                        //has TCP payload
+                        payload = (char *)((char *)ptcp + BYTES_PER_32BIT_WORD * ptcp->th_off);
+                        payload_str = string(payload);
+                        if (b1 && !b2) {
+                            //UPLINK
+                            if (payload_str.find("GET ") == 0 || payload_str.find("HEAD ") == 0 ||
+                                payload_str.find("POST ") == 0 || payload_str.find("PUT ") == 0 ||
+                                payload_str.find("DELETE ") == 0 || payload_str.find("TRACE ") == 0 ||
+                                payload_str.find("OPTIONS ") == 0 || payload_str.find("CONNECT ") == 0 ||
+                                payload_str.find("PATCH ") == 0) {
+                                //uplink HTTP request
+                            }
+                        }
+                    
+                    }
+                    
+                    
                     //BWE analysis, the first part can be used for G inference only
                     if (flow->gval < 0) {
                         //do G inference for BW estimate
@@ -534,9 +570,11 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                 if (b1 && !b2) { // uplink
                     ip_clt = pip->ip_src.s_addr;
                     ip_svr = pip->ip_dst.s_addr;
+                    udp_up_bytes += payload_len;
                 } else if (!b1 && b2) { //downlink
                     ip_clt = pip->ip_dst.s_addr;
                     ip_svr = pip->ip_src.s_addr;
+                    udp_down_bytes += payload_len;
                 } else {
                     break;
                 }
@@ -624,7 +662,12 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
         }
         
         //everything is in IP
+        
+        if (ts > userp->last_packet_time + 1.0) {
+            printf("UI %.4lf\n", ts - userp->last_packet_time);
+        }
         userp->last_packet_time = ts;
+        
         
     } else {
         no_ip_count++;
@@ -650,6 +693,14 @@ int init_global() {
     ignore_count1 = 0;
     ignore_count2 = 0;
     flow_count = 0;
+    
+    tcp_up_bytes = 0;
+    tcp_down_bytes = 0;
+    udp_up_bytes = 0;
+    udp_down_bytes = 0;
+    http_up_bytes = 0;
+    http_down_bytes = 0;
+
     
     ack_delay = -1;
     
@@ -726,14 +777,22 @@ int read_pcap_trace(const char * filename) {
             cout << "SIP " << ConvertIPToString((*csit).first) << " " << (*csit).second << endl;
     }//*/
     
-    cout << "PacketCount " << packet_count << " " << filename << endl;
-    cout << "NoIpCount " << no_ip_count << " " << filename << endl;
-    cout << "TcpCount " << tcp_count << " " << filename << endl;
-    cout << "UdpCount " << udp_count << " " << filename << endl;
-    cout << "IcmpCount " << icmp_count << " " << filename << endl;
-    cout << "IgnoreCount1 " << ignore_count1 << " " << filename << endl;
-    cout << "IgnoreCount2 " << ignore_count2 << " " << filename << endl;
-    cout << "FlowCount " << flow_count << " " << filename << endl; // count of all flows, some may not closed at all
+    cout << "PacketCount " << packet_count << endl;
+    cout << "NoIpCount " << no_ip_count << endl;
+    cout << "TcpCount " << tcp_count << endl;
+    cout << "UdpCount " << udp_count << endl;
+    cout << "IcmpCount " << icmp_count << endl;
+    cout << "IgnoreCount1 " << ignore_count1 << endl;
+    cout << "IgnoreCount2 " << ignore_count2 << endl;
+    cout << "FlowCount " << flow_count << endl; // count of all flows, some may not closed at all
+    
+    cout << "tcp_up_bytes " << tcp_up_bytes << endl;
+    cout << "tcp_down_bytes " << tcp_down_bytes << endl;
+    cout << "udp_up_bytes " << udp_up_bytes << endl;
+    cout << "udp_down_bytes " << udp_down_bytes << endl;
+    cout << "http_up_bytes " << http_up_bytes << endl;
+    cout << "http_down_bytes " << http_down_bytes << endl;
+    
     cout << "StartTime " << start_time_sec << endl;
     cout << "EndTime " << end_time_sec << endl;
     cout << "Duration " << end_time_sec - start_time_sec << endl;
