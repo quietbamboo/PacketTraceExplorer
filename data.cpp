@@ -663,11 +663,10 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
         
         //everything is in IP
         
-        if (ts > userp->last_packet_time + 1.0) {
+        if (userp->last_packet_time > 0 && ts > userp->last_packet_time + 1.0) {
             printf("UI %.4lf\n", ts - userp->last_packet_time);
         }
         userp->last_packet_time = ts;
-        
         
     } else {
         no_ip_count++;
