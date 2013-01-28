@@ -56,7 +56,7 @@ int main(int argc, const char * argv[]) {
     //init
     init_global();
     
-    /*//one file analysis
+    //one file analysis
     const char *test_file;
     switch (RUNNING_LOCATION) {
         case RLOC_ATT_SERVER:
@@ -69,16 +69,16 @@ int main(int argc, const char * argv[]) {
             //test_file = "/Users/hjx/Documents/trace_explorer/dupack.pcap";
             break;
         case RLOC_CONTROL_SERVER:
-            test_file = "/Users/hjx/Documents/trace_explorer/user_target.pcap";
+            test_file = "/Users/hjx/Documents/trace_explorer/shazam_iphone4.pcap";
+            //test_file = "/Users/hjx/Documents/trace_explorer/user_target.pcap";
             //test_file = "/Users/hjx/Documents/4G/figures/traffic/traces/tcpDownlink-new/121226tcpdownnwlte2/121226_042616731_tcp_down_thrpt_nw_lte_server.pcap";
             //test_file = "/Users/hjx/Documents/4G/figures/traffic/traces/tcpDownlink-new/1301nexus/130101_120301140_tcp_down_thrpt_sld_3g_server.pcap";
             //test_file = "/Users/hjx/Documents/trace_explorer/backup/test/server_filtered.pcap";
             //test_file = "/Users/hjx/Documents/4G/figures/traffic/traces/tcpDownlink-new/121219nwtcpdown1/121219152225-downtcpserver.pcap";
             break;
         case RLOC_CONTROL_CLIENT:
-            //test_file = "/Users/hjx/Documents/4G/figures/traffic/traces/tcpDownlink-new/121226tcpdownnwlte2/121226_042616731_tcp_down_thrpt_nw_lte_device_filtered.pcap";
-            test_file = "/Users/hjx/Documents/4G/figures/traffic/traces/tcpDownlink-new/1301nexus/130101_120301140_tcp_down_thrpt_sld_3g_device.pcap";
-            
+            test_file = "/Users/hjx/Documents/4G/figures/traffic/traces/tcpDownlink-new/121226tcpdownnwlte2/121226_042616731_tcp_down_thrpt_nw_lte_device_filtered.pcap";
+            //test_file = "/Users/hjx/Documents/4G/figures/traffic/traces/tcpDownlink-new/1301nexus/130101_120301140_tcp_down_thrpt_sld_3g_device.pcap";
             //test_file = "/Users/hjx/Documents/4G/figures/traffic/traces/udpDownlink-new/121219nwudpdown1/121219160150-downudpnwlte.pcap";
             //test_file = "/Users/hjx/Documents/4G/figures/traffic/traces/tcpDownlink-new/121219nwtcpdown1/121219152241-downtcpnwlte.pcap";
             break;

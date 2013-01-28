@@ -211,7 +211,7 @@ void tcp_flow::update_seq_x(u_int seq, u_short payload_len, double ts) {
     
     if (payload_len > 0 && ts - last_time > IDLE_THRESHOLD) {
         idle_time += (ts - last_time);
-        printf("I %.4lf D\n", ts - last_time);
+        //printf("I %.4lf D\n", ts - last_time);
     }
     
     if (packet_count == 2) {
@@ -262,7 +262,7 @@ void tcp_flow::update_ack_x(u_int ack, u_short payload_len, double _actual_ts) {
     }
     if (payload_len > 0 && _actual_ts - last_time > IDLE_THRESHOLD) {
         idle_time += (_actual_ts - last_time);
-        printf("I %.4lf U\n", _actual_ts - last_time);
+        //printf("I %.4lf U\n", _actual_ts - last_time);
     }
     
     if (packet_count == 2) {

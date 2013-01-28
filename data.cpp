@@ -148,7 +148,6 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
             case IPPROTO_TCP:
                 
                 //break; //TODO only look at UDP now
-                
                 tcp_count++;
                 ptcp = (tcphdr *)((u_char *)pip + BYTES_PER_32BIT_WORD * pip->ip_hl); //cast of u_char* is necessary
                 payload_len = bswap16(pip->ip_len) - BYTES_PER_32BIT_WORD * (pip->ip_hl + ptcp->th_off);
@@ -251,7 +250,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     }
                     
                     //sequence number ACK number plot
-                    /*bool isUplink = true;
+                    bool isUplink = false; //true for ACK, false for SEQ
                     if (RUNNING_LOCATION == RLOC_CONTROL_SERVER) {
                         if (b1 && !b2 && isUplink) { // uplink, for ack
                              cout << ts << " " << packet_count;
@@ -657,7 +656,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
         //everything is in IP
         
         if (userp->last_packet_time > 0 && ts > userp->last_packet_time + 1.0) {
-            printf("UI %.4lf\n", ts - userp->last_packet_time);
+            //printf("UI %.4lf\n", ts - userp->last_packet_time);
         }
         userp->last_packet_time = ts;
         

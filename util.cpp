@@ -16,7 +16,8 @@ void MyAssert(bool x, int aid) {
 bool isClient(in_addr addr) {
     if (RUNNING_LOCATION == RLOC_CONTROL_CLIENT || RUNNING_LOCATION == RLOC_CONTROL_SERVER)
         //for Yihua's trace, server trace: client is 198.*; client trace: client is 10.*; and 32.* for 3G trace
-        return ((addr.s_addr & 0xFF) == 198 ||
+        return ((addr.s_addr & 0xFF) == 192 ||
+                (addr.s_addr & 0xFF) == 198 ||
                 (addr.s_addr & 0xFF) == 10 ||
                 (addr.s_addr & 0xFF) == 32) ? true : false;
     else
