@@ -26,6 +26,10 @@ public:
     u_int u_int_start;
     double double_start;
     int promotion_delay;
+    u_int window_scale;
+    u_int window_initial_size;
+    u_int window_size;
+    double unaffected_time;
     
     double target;
     double bwstep;
@@ -70,6 +74,10 @@ public:
     
     //HTTP analysis
     u_short http_request_count;
+    string content_type;
+    string user_agent;
+    string host;
+    u_int total_content_length;
 
     tcp_flow();
     

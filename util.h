@@ -46,4 +46,7 @@ u_int bswap32(u_int);
 
 vector <string> split(const string& str, const string& delimiter = " ");
 
+string compress_user_agent(string ua);
+string process_content_type(string str);
+
 #endif /* defined(__PacketTraceExplorer__util__) */

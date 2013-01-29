@@ -30,7 +30,11 @@ tcp_flow::tcp_flow() {
     u_int_start = 0;
     double_start = -1.0;
     promotion_delay = 0;
-    
+    window_scale = 0;
+    window_initial_size = 0;
+    window_size = 0;
+    unaffected_time = 0;
+
     has_ts_option_clt = false;
     has_ts_option_svr = false;
     first_byte_time = 0;
@@ -52,6 +56,10 @@ tcp_flow::tcp_flow() {
     
     //HTTP analysis
     http_request_count = 0;
+    content_type = "";
+    user_agent = "";
+    host = "";
+    total_content_length = 0;
 
     total_bw = 0;
     sample_count = 0;
@@ -175,7 +183,7 @@ void tcp_flow::update_seq_x(u_int seq, u_short payload_len, double ts) {
     
     if (payload_len > 0) {
         //Slow start after dup ack
-        if (dup_ack_count_current > 20) {
+        /*if (dup_ack_count_current > 20) {
             bytes_after_dupack += payload_len;
             if (first_bw == 0 && ts - last_dupack_time > DUPACK_SLOWSTART_TIME && ts - last_dupack_time <= 2 * DUPACK_SLOWSTART_TIME) {
                 //this is the time to output a throughput sample
@@ -193,7 +201,7 @@ void tcp_flow::update_seq_x(u_int seq, u_short payload_len, double ts) {
                 bytes_after_dupack = 0;
                 first_bw = 0;
             }
-        }
+        }//*/
         
         //Bytes in flight
         if (ai == -1) {
@@ -201,9 +209,18 @@ void tcp_flow::update_seq_x(u_int seq, u_short payload_len, double ts) {
         } else {
             bytes_in_fly = seq_down[si] - ack_down[ai];
         }
-        if (bytes_in_fly > max_bytes_in_fly)
+        if (bytes_in_fly > max_bytes_in_fly) {
             max_bytes_in_fly = bytes_in_fly;
-    }    
+        }
+    }
+    
+    if (bytes_in_fly == window_size || window_size == 0) {
+        //window full or 0 window
+        if (unaffected_time == 0) {
+            unaffected_time = ts;
+        }
+    }
+
     
     if (last_time < 0) {
         last_time = ts;
@@ -418,9 +435,16 @@ void tcp_flow::print(u_short processed_flags) {
     double avg_bw = 0;
     if (sample_count > 0)
         avg_bw = (double)(total_bw / (double)sample_count);
+    if (user_agent.length() == 0)
+        user_agent = "!";
+    if (content_type.length() == 0)
+        content_type = "!";
+    if (host.length() == 0)
+        host = "!";
 
+    
     printf("%s ", ConvertIPToString(clt_ip)); // 1
-    printf("%s %d %d %.4lf %.4lf %.4lf %.4lf %d %d %d %lld %lld %.4lf %lld %.4lf %.4lf %lld %lld %.4lf %d %.4lf %d %lld %.4lf %.4lf %d\n",
+    printf("%s %d %d %.4lf %.4lf %.4lf %.4lf %d %d %d %lld %lld %.4lf %lld %.4lf %.4lf %lld %lld %.4lf %d %.4lf %d %lld %.4lf %.4lf %d %d %d %.4lf %s %s %s %d\n",
            ConvertIPToString(svr_ip), //2
            clt_port, //3
            svr_port, //4
@@ -446,6 +470,13 @@ void tcp_flow::print(u_short processed_flags) {
            packet_count, //24
            promotion_delay * gval - (syn_rtt + syn_ack_rtt), //25
            idle_time_before_syn, //26
-           http_request_count //27
+           http_request_count, //27
+           window_scale, //28
+           window_initial_size, //29
+           unaffected_time, //30
+           user_agent.c_str(), //31
+           content_type.c_str(), //32
+           host.c_str(), //33
+           total_content_length //34
            );
 }

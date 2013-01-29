@@ -46,6 +46,7 @@ double ack_delay;
 u_int expected_ack;
 u_int *opt_ts;
 u_short opt_len;
+u_int window_scale;
 
 __gnu_cxx::hash_set<u_int> enb_ip;
 __gnu_cxx::hash_set<u_int> core_ip;
@@ -75,6 +76,8 @@ client_bw *bw_udp = NULL;
 client_bw *bw_tcp = NULL;
 char *payload;
 string payload_str;
+size_t start_pos;
+size_t end_pos;
 
 void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_char *pkt_data) {
     //c is not used
@@ -152,19 +155,27 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                 ptcp = (tcphdr *)((u_char *)pip + BYTES_PER_32BIT_WORD * pip->ip_hl); //cast of u_char* is necessary
                 payload_len = bswap16(pip->ip_len) - BYTES_PER_32BIT_WORD * (pip->ip_hl + ptcp->th_off);
                 
-                //find where timestamps options is
                 opt_len = BYTES_PER_32BIT_WORD * ptcp->th_off - 20;
                 opt_ts = (u_int *)((u_char *)ptcp + 20);
+                window_scale = -1;
                 while (opt_len >= 10) { //Timestamps option at least 10 bytes
                     if ((*((u_char *)opt_ts)) == 0x08 && (*(((u_char *)opt_ts) + 1)) == 0x0a) {
                         opt_ts = (u_int *)((u_char *)opt_ts + 2);
                         opt_len = 100;
                         break;
+                    } else if ((*((u_char *)opt_ts)) == 0x00 || (*((u_char *)opt_ts)) == 0x01) {
+                        //NOP
+                        opt_ts = (u_int *)((u_char *)opt_ts + 1); //opt_ts + 1 is length field
+                        opt_len--;
+                    } else {
+                        if ((*((u_char *)opt_ts)) == 0x03) {
+                            //window scale option in the SYN packet
+                            window_scale = (1 << (*((u_int *)((u_char *)opt_ts + 2))));
+                        }
+                        opt_len -= (u_int)(*((u_char *)opt_ts + 1));
+                        opt_ts = (u_int *)((u_char *)opt_ts + (u_int)(*((u_char *)opt_ts + 1))); //opt_ts + 1 is length field
                     }
-                    opt_ts = (u_int *)((u_char *)opt_ts + 1);
-                    opt_len--;
                 }
-                
                 
                 if (RUNNING_LOCATION == RLOC_CONTROL_CLIENT) {
                     //TCP client side throughput sampling
@@ -234,7 +245,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     sip[ip_svr]++;
                     break;*/
                     
-                    //dump concurrency results
+                    /*//dump concurrency results
                     if (ts - last_sample_time > 100.0) {
                         last_sample_time = ts;
                         for (user_it = users.begin() ; user_it != users.end() ; user_it++) {
@@ -247,10 +258,10 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                             if (concurrency > 0)
                                 printf("CC %.4lf %d\n", ts, concurrency);
                         }
-                    }
+                    }//*/
                     
                     //sequence number ACK number plot
-                    bool isUplink = false; //true for ACK, false for SEQ
+                    /*bool isUplink = false; //true for ACK, false for SEQ
                     if (RUNNING_LOCATION == RLOC_CONTROL_SERVER) {
                         if (b1 && !b2 && isUplink) { // uplink, for ack
                              cout << ts << " " << packet_count;
@@ -424,9 +435,11 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                                 if (flow->packet_count == 1) {
                                     //SYN
                                     flow->promotion_delay = -1 * bswap32(*opt_ts);
-                                } else if (flow->packet_count == 3) {
+                                    flow->window_scale = window_scale;
+                                } else if (flow->packet_count == 3 && (ptcp->th_flags & TH_SYN) == 0) { //this is not a repeated SYN
                                     //ACK 3
                                     flow->promotion_delay += bswap32(*opt_ts);
+                                    flow->window_initial_size = flow->window_scale * bswap16(ptcp->th_win);
                                 }
                             }
                         } else if (!b1 && b2) { //downlink
@@ -442,12 +455,14 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         }
                     }
                     
+                    
                     //RTT and TCP pattern analysis
                     if (ip_clt == flow->clt_ip &&
                         ip_svr == flow->svr_ip &&
                         port_clt == flow->clt_port &&
                         port_svr == flow->svr_port) {
                         if (b1 && !b2) { // uplink
+                            flow->window_size = flow->window_scale * bswap16(ptcp->th_win); //only update receiver's window
                             flow->update_ack_x(bswap32(ptcp->th_ack), payload_len, ts);
                         } else if (!b1 && b2) { //downlink
                             flow->update_seq_x(bswap32(ptcp->th_seq), payload_len, ts);
@@ -472,6 +487,43 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                                 payload_str.find("PATCH ") == 0) {
                                 //uplink HTTP request
                                 flow->http_request_count++;
+                                
+                                if (flow->user_agent.length() == 0) {
+                                    //only record the first user agent
+                                    start_pos = payload_str.find("User-Agent: ");
+                                    end_pos = payload_str.find("\r\n", start_pos);
+                                    if (start_pos != string::npos && end_pos > start_pos + 12)
+                                        flow->user_agent = compress_user_agent(payload_str.substr(start_pos + 12, end_pos - start_pos - 12));
+                                }
+                                
+                                if (flow->host.length() == 0) {
+                                    //only record the first user agent
+                                    start_pos = payload_str.find("Host: ");
+                                    end_pos = payload_str.find("\r\n", start_pos);
+                                    if (start_pos != string::npos && end_pos > start_pos + 6)
+                                        flow->host = payload_str.substr(start_pos + 6, end_pos - start_pos - 6);
+                                }
+                            }
+                        } else if (!b1 && b2) {
+                            //DOWNLINK
+                            if (payload_str.find("HTTP/1.1 200 OK") == 0 || payload_str.find("HTTP/1.0 200 OK") == 0) {
+                                //downlink HTTP 200 OK
+                                
+                                if (flow->content_type.length() == 0) {
+                                    //only record the first content type
+                                    start_pos = payload_str.find("Content-Type: ");
+                                    end_pos = payload_str.find("\r\n", start_pos);
+                                    if (start_pos != string::npos && end_pos > start_pos + 14)
+                                        flow->content_type = process_content_type(payload_str.substr(start_pos + 14, end_pos - start_pos - 14));
+                                }
+                                
+                                start_pos = payload_str.find("Content-Length: ");
+                                end_pos = payload_str.find("\r\n", start_pos);
+                                if (start_pos != string::npos && end_pos > start_pos + 16)
+                                    flow->total_content_length += StringToNumber<int>(payload_str.substr(start_pos + 16, end_pos - start_pos - 16));
+                                
+                            //} else if (payload_str.find("HTTP/") == 0 && payload_str.find("200 OK") != -1) {
+                            //    cout << "HTTP_RESPONSE_SPECIAL " << payload_str << endl;
                             }
                         }
                     }

@@ -54,7 +54,7 @@ int main(int argc, const char * argv[]) {
     
     
     //init
-    init_global();
+    /*init_global();
     
     //one file analysis
     const char *test_file;
