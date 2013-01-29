@@ -444,8 +444,8 @@ void tcp_flow::print(u_short processed_flags) {
 
     
     printf("%s ", ConvertIPToString(clt_ip)); // 1
-    printf("%s %d %d %.4lf %.4lf %.4lf %.4lf %d %d %d %lld %lld %.4lf %lld %.4lf %.4lf %lld %lld %.4lf %d %.4lf %d %lld %.4lf %.4lf %d %d %d %.4lf %s %s %s %d\n",
-           ConvertIPToString(svr_ip), //2
+    printf("%s ", ConvertIPToString(svr_ip)); //2
+    printf("%d %d %.4lf %.4lf %.4lf %.4lf %d %d %d %lld %lld %.4lf %lld %.4lf %.4lf %lld %lld %.4lf %d %.4lf %d %lld %.4lf %.4lf %d %d %d %.4lf ",
            clt_port, //3
            svr_port, //4
            start_time, //5
@@ -473,7 +473,9 @@ void tcp_flow::print(u_short processed_flags) {
            http_request_count, //27
            window_scale, //28
            window_initial_size, //29
-           unaffected_time, //30
+           unaffected_time //30
+           );
+    printf("%s %s %s %d\n",
            user_agent.c_str(), //31
            content_type.c_str(), //32
            host.c_str(), //33

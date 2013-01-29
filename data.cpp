@@ -78,6 +78,7 @@ char *payload;
 string payload_str;
 size_t start_pos;
 size_t end_pos;
+u_int jump;
 
 void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_char *pkt_data) {
     //c is not used
@@ -157,7 +158,8 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                 
                 opt_len = BYTES_PER_32BIT_WORD * ptcp->th_off - 20;
                 opt_ts = (u_int *)((u_char *)ptcp + 20);
-                window_scale = -1;
+                window_scale = 0;
+                
                 while (opt_len >= 10) { //Timestamps option at least 10 bytes
                     if ((*((u_char *)opt_ts)) == 0x08 && (*(((u_char *)opt_ts) + 1)) == 0x0a) {
                         opt_ts = (u_int *)((u_char *)opt_ts + 2);
@@ -172,8 +174,14 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                             //window scale option in the SYN packet
                             window_scale = (1 << (*((u_int *)((u_char *)opt_ts + 2))));
                         }
-                        opt_len -= (u_int)(*((u_char *)opt_ts + 1));
-                        opt_ts = (u_int *)((u_char *)opt_ts + (u_int)(*((u_char *)opt_ts + 1))); //opt_ts + 1 is length field
+                        jump = (u_int)(*((u_char *)opt_ts + 1));
+                        if (jump > opt_len || jump <= 0) {
+                            //something weird happens
+                            opt_len = 0;
+                            break;
+                        }
+                        opt_len -= jump;
+                        opt_ts = (u_int *)((u_char *)opt_ts + jump); //opt_ts + 1 is length field
                     }
                 }
                 
