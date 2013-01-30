@@ -444,7 +444,8 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                                     //SYN
                                     flow->promotion_delay = -1 * bswap32(*opt_ts);
                                     flow->window_scale = window_scale;
-                                } else if (flow->packet_count == 3 && (ptcp->th_flags & TH_SYN) == 0) { //this is not a repeated SYN
+                                } else if (flow->packet_count == 3 && (ptcp->th_flags & TH_SYN) == 0) {
+                                    //this is not a repeated SYN
                                     //ACK 3
                                     flow->promotion_delay += bswap32(*opt_ts);
                                     flow->window_initial_size = flow->window_scale * bswap16(ptcp->th_win);
@@ -542,18 +543,15 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         //do G inference for BW estimate
                         if (b1 && !b2) { // uplink
                             if ((ptcp->th_flags & TH_ACK) != 0) {
-
-                                if (flow->double_start < 0) {
-                                    flow->u_int_start = bswap32(*opt_ts);
-                                    flow->double_start = ts;
-                                    //cout << "TCP header length of the first uplink ACK " << BYTES_PER_32BIT_WORD * ptcp->th_off << endl;
-                                    if (BYTES_PER_32BIT_WORD * ptcp->th_off < 32) {
-                                        //no TCP timestamp options, can't use G inference and BW estimation
-                                        flow->double_start = -1.0;
+                                if (opt_len == 100) {
+                                    if (flow->double_start < 0) {
+                                        flow->u_int_start = bswap32(*opt_ts);
+                                        flow->double_start = ts;
+                                        //cout << "TCP header length of the first uplink ACK " << BYTES_PER_32BIT_WORD * ptcp->th_off << endl;
+                                    } else if (flow->double_start > 0 && ts - flow->double_start > GVAL_TIME) {
+                                        flow->gval = (ts - flow->double_start) / (bswap32(*opt_ts) - flow->u_int_start);
+                                        //cout << "G_INFER " << " t_off " << (ts - flow->double_start) << " G: " << flow->gval << " s/tick" << endl;
                                     }
-                                } else if (flow->double_start > 0 && ts - flow->double_start > GVAL_TIME) {
-                                    flow->gval = (ts - flow->double_start) / (bswap32(*opt_ts) - flow->u_int_start);
-                                    //cout << "G_INFER " << " t_off " << (ts - flow->double_start) << " G: " << flow->gval << " s/tick" << endl;
                                 }
                             }
                         }
