@@ -269,7 +269,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     }//*/
                     
                     //sequence number ACK number plot
-                    /*bool isUplink = false; //true for ACK, false for SEQ
+                    /*bool isUplink = true; //true for ACK, false for SEQ
                     if (RUNNING_LOCATION == RLOC_CONTROL_SERVER) {
                         if (b1 && !b2 && isUplink) { // uplink, for ack
                              cout << ts << " " << packet_count;
@@ -475,6 +475,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         } else if (!b1 && b2) { //downlink
                             flow->update_seq_x(bswap32(ptcp->th_seq), payload_len, ts);
                         }
+                        cout << "EMPTY_WINDOW " << ts << " " << flow->window_size - flow->bytes_in_fly << endl;
                         //sample bytes_in_fly
                         //if ((SAMPLES++) % SAMPLE_CYCLE == 0)
                         //    cout << "BF " << flow->bytes_in_fly << endl;
