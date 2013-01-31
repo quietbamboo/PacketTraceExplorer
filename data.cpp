@@ -440,11 +440,11 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                                 //there is TCP timestamp options
                                 flow->has_ts_option_clt = true;
                                 
-                                if (flow->packet_count == 1) {
+                                if (flow->packet_count == 1 && (ptcp->th_flags & TH_SYN) != 0) {
                                     //SYN
                                     flow->promotion_delay = -1 * bswap32(*opt_ts);
                                     flow->window_scale = window_scale;
-                                } else if (flow->packet_count == 3 && (ptcp->th_flags & TH_SYN) == 0) {
+                                } else if (flow->packet_count == 3 && (ptcp->th_flags & TH_SYN) == 0 && flow->promotion_delay < 0) {
                                     //this is not a repeated SYN
                                     //ACK 3
                                     flow->promotion_delay += bswap32(*opt_ts);
@@ -476,7 +476,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                         } else if (!b1 && b2) { //downlink
                             flow->update_seq_x(bswap32(ptcp->th_seq), payload_len, ts);
                         }
-                        cout << "EMPTY_WINDOW " << ts << " " << flow->window_size - flow->bytes_in_fly << endl;
+                        //cout << "EMPTY_WINDOW " << ts << " " << flow->window_size - flow->bytes_in_fly << endl;
                         //sample bytes_in_fly
                         //if ((SAMPLES++) % SAMPLE_CYCLE == 0)
                         //    cout << "BF " << flow->bytes_in_fly << endl;
@@ -484,7 +484,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                     }//*/
                     
                     //HTTP analysis
-                    if (ETHER_HDR_LEN + BYTES_PER_32BIT_WORD * (pip->ip_hl + ptcp->th_off) < header->caplen) {
+                    /*if (ETHER_HDR_LEN + BYTES_PER_32BIT_WORD * (pip->ip_hl + ptcp->th_off) < header->caplen) {
                         //has TCP payload
                         payload = (char *)((char *)ptcp + BYTES_PER_32BIT_WORD * ptcp->th_off);
                         payload_str = string(payload);
@@ -536,7 +536,7 @@ void dispatcher_handler(u_char *c, const struct pcap_pkthdr *header, const u_cha
                             //    cout << "HTTP_RESPONSE_SPECIAL " << payload_str << endl;
                             }
                         }
-                    }
+                    }//*/
                     
                     //BWE analysis, the first part can be used for G inference only
                     if (flow->gval < 0) {

@@ -53,7 +53,7 @@ int main(int argc, const char * argv[]) {
     cout << "ConvertIPToString called twice " << ConvertIPToString(11) << " => " << ConvertIPToString(22) << endl;
     
     
-    //init
+    /*//init
     init_global();
     
     //one file analysis
